@@ -1,0 +1,227 @@
+[
+  {
+    "path": "LICENSE",
+    "source": "references/hellohpc-2nd/LICENSE",
+    "sha256": "047d2259741a3ebb30d8c8a43d4ba79b5b229a069acd1d2bea49f22b297d8e98"
+  },
+  {
+    "path": "cpu/accelerate/src/solver.py",
+    "source": "solutions/accelerate/src/solver.py",
+    "sha256": "0e38b42dad7cb6afa80ff352b80ac4a9f027e4a1ddc5e0465f7eb98b625cf86c"
+  },
+  {
+    "path": "cpu/accelerate/env.sh",
+    "source": "solutions/accelerate/env.sh",
+    "sha256": "94ca40ba4606768d1e115031776621946d7b4af239a8e586dbd58b5b117f3584"
+  },
+  {
+    "path": "cpu/miniclash/source_code/block0.cpp",
+    "source": "solutions/miniclash/source_code/block0.cpp",
+    "sha256": "249fe9de8328878c7608e9e8eabd9a7fb68b3e461e9fe766bc1b6fdfa1c917c2"
+  },
+  {
+    "path": "cpu/miniclash/source_code/block1.cpp",
+    "source": "solutions/miniclash/source_code/block1.cpp",
+    "sha256": "acdf8ba96fdf997af9caa929c29ae3201c05ebcb06a4b6a283052ee43665b624"
+  },
+  {
+    "path": "cpu/miniclash/source_code/block1stevens00.cpp",
+    "source": "solutions/miniclash/source_code/block1stevens00.cpp",
+    "sha256": "a670bd099ef3123ce632443a427f9109743694ed6adbe850af232fd90201080d"
+  },
+  {
+    "path": "cpu/miniclash/source_code/block1stevens01.cpp",
+    "source": "solutions/miniclash/source_code/block1stevens01.cpp",
+    "sha256": "9790d784ccb4195c49851492a213626554112adb0a39e605fe327f357b23a0fb"
+  },
+  {
+    "path": "cpu/miniclash/source_code/block1stevens10.cpp",
+    "source": "solutions/miniclash/source_code/block1stevens10.cpp",
+    "sha256": "e825d010e1649f25021d82fe17e0632ca69da841bc9810945bd837bb592c0451"
+  },
+  {
+    "path": "cpu/miniclash/source_code/block1stevens11.cpp",
+    "source": "solutions/miniclash/source_code/block1stevens11.cpp",
+    "sha256": "a5ac624698779ebff6d9e5cc8eafc5a90f9c73d4ec2311bb3ce4265f622836c6"
+  },
+  {
+    "path": "cpu/miniclash/source_code/block1wang.cpp",
+    "source": "solutions/miniclash/source_code/block1wang.cpp",
+    "sha256": "a2207e1096a268feac0b3fd2d0d5299b391272802394ec98827505ca663c88ae"
+  },
+  {
+    "path": "cpu/miniclash/source_code/dispatch.py",
+    "source": "solutions/miniclash/source_code/dispatch.py",
+    "sha256": "a6f66db863bc926403aa9d6a9fdb74cab428a8b7fb27b05227c788d7ec972862"
+  },
+  {
+    "path": "cpu/miniclash/source_code/LICENSE.txt",
+    "source": "solutions/miniclash/source_code/LICENSE.txt",
+    "sha256": "185939279ca77fb5ed558391bc1b75d3c27b9b1a2bda4f32db0ee2a5e3914de2"
+  },
+  {
+    "path": "cpu/miniclash/source_code/main.cpp",
+    "source": "solutions/miniclash/source_code/main.cpp",
+    "sha256": "0d84cb386c8c6dca83e1b73e6f415e736ea6ea0a9cbfab740e394470947cccf7"
+  },
+  {
+    "path": "cpu/miniclash/source_code/main.hpp",
+    "source": "solutions/miniclash/source_code/main.hpp",
+    "sha256": "d84accd6676597b3207c088b4048f58cae69eee27a268457e4d32363feae4670"
+  },
+  {
+    "path": "cpu/miniclash/source_code/Makefile",
+    "source": "solutions/miniclash/source_code/Makefile",
+    "sha256": "781b3032a5a6ba30defed9a3cb965dba6a81f0b5fa1d8c831ef1f1d2274c74a4"
+  },
+  {
+    "path": "cpu/miniclash/source_code/md5.cpp",
+    "source": "solutions/miniclash/source_code/md5.cpp",
+    "sha256": "8b963fb7678cb882befd158724c8f66734c0e2c22fb686c900902377aa5442ae"
+  },
+  {
+    "path": "cpu/miniclash/source_code/run-serial.sh",
+    "source": "solutions/miniclash/source_code/run-serial.sh",
+    "sha256": "5b41dc165c61a881ad289deee40c7f09e4b5d2cf6e6a9ebaf8df36cf81fcdd5d"
+  },
+  {
+    "path": "cpu/miniclash/source_code/run.sh",
+    "source": "solutions/miniclash/source_code/run.sh",
+    "sha256": "a469539b8f2569efc5c3aacd9c63de3e260ec9668b3eff2b70b241994ae67f48"
+  },
+  {
+    "path": "cpu/miniclash/source_code/timer.cpp",
+    "source": "solutions/miniclash/source_code/timer.cpp",
+    "sha256": "a6f16cc8cfff93a58bb02f8005e4e19bf6a1e3f881315c498a41582af79a14a3"
+  },
+  {
+    "path": "cpu/miniclash/source_code/timer.hpp",
+    "source": "solutions/miniclash/source_code/timer.hpp",
+    "sha256": "a417341b8400ae9a3dea8859144b207f8fa7fc81649e58e4319031930ce4ab0f"
+  },
+  {
+    "path": "cpu/miniclash/source_code/types.hpp",
+    "source": "solutions/miniclash/source_code/types.hpp",
+    "sha256": "5d6c5bc454469c37d5863c2bfa5bcbe280b03b2c375ce3f31ef55bba2c857ec6"
+  },
+  {
+    "path": "cpu/rune/policy.py",
+    "source": "solutions/rune/policy.py",
+    "sha256": "a1e0835efd4c7b885d3dc6e220d6cd14d87afbdb316ac9c1dbc46e64468d308f"
+  },
+  {
+    "path": "npu/llm-serving/stage1/build.def",
+    "source": "solutions/llm-serving/submission/build.def",
+    "sha256": "b30ca9c230d76f08824f28bdca9fa71f356db3b05cff20b11c4579d19b650c1f"
+  },
+  {
+    "path": "npu/llm-serving/stage1/start.sh",
+    "source": "solutions/llm-serving/submission/start.sh",
+    "sha256": "778fd75db5dc83778f38fafb9e037f2d64b5bc2e31b40d36fca6fbce5e5db84c"
+  },
+  {
+    "path": "npu/llm-serving/stage2-candidate/start.sh",
+    "source": "submissions/llm-stage2-start-audited.sh",
+    "sha256": "174bb8dc7c413af9484315b97f8f800aca1483406eda6dcc18852d462166b6e8"
+  },
+  {
+    "path": "cheatsheet/SKILL.md",
+    "source": "submissions/cheatsheet-final/SKILL.md",
+    "sha256": "887441193bab6f1ca89b62a9ace4b8c4ecd070087c940c76f066d9fd5cf50212"
+  },
+  {
+    "path": "cheatsheet/submission.yaml",
+    "source": "submissions/cheatsheet-final/submission.yaml",
+    "sha256": "a4d0fa08a70f7fb3cfa5e13b369db6cca7a8b1dcba8634db65b372c7a8f52aa7"
+  },
+  {
+    "path": "cpu/maimoe/solution/Kernel.cpp",
+    "source": "solutions/maimoe/maimoe-final.zip!solution/Kernel.cpp",
+    "sha256": "db693955ba1ec5bd52b40621b5cf5b1ca7118f8458e5214629f5f6f1291541f2"
+  },
+  {
+    "path": "cpu/maimoe/solution/KstroParam.toml",
+    "source": "solutions/maimoe/maimoe-final.zip!solution/KstroParam.toml",
+    "sha256": "adafae890be8dbe69abe4106490cca166ab36d7b4a6134531d3afb30ad02e25f"
+  },
+  {
+    "path": "npu/ragged-softmax/verified-v23/solution/CMakeLists.txt",
+    "source": "submissions/rsm-v23-final-verified.zip!solution/CMakeLists.txt",
+    "sha256": "68b33d6ab3616a6d388537282d10204417debcb3cff4fbffed477fc25657ba52"
+  },
+  {
+    "path": "npu/ragged-softmax/verified-v23/solution/op_host/rsm_solution_host.cpp",
+    "source": "submissions/rsm-v23-final-verified.zip!solution/op_host/rsm_solution_host.cpp",
+    "sha256": "efab5e3905ca17436f4732d6f1d6f3c0e2d13436a8660c69f4e69afe8173cff7"
+  },
+  {
+    "path": "npu/ragged-softmax/verified-v23/solution/op_host/rsm_solution_host.h",
+    "source": "submissions/rsm-v23-final-verified.zip!solution/op_host/rsm_solution_host.h",
+    "sha256": "b8b00045773cc9b0606e19dc51064629c52eacefa533a616067f07dac8f02126"
+  },
+  {
+    "path": "npu/ragged-softmax/verified-v23/solution/op_kernel/rsm_solution.cpp",
+    "source": "submissions/rsm-v23-final-verified.zip!solution/op_kernel/rsm_solution.cpp",
+    "sha256": "da401229c1b44d13a237465ffdbea35b2aef00fce26482f448d619546a2fc65c"
+  },
+  {
+    "path": "npu/ragged-softmax/verified-v23/solution/op_kernel/rsm_solution_core.h",
+    "source": "submissions/rsm-v23-final-verified.zip!solution/op_kernel/rsm_solution_core.h",
+    "sha256": "8673ce6ff7f035055d4e9c8af03ec4b45cd3d91444347bbfbd8ccd8fdd483f1d"
+  },
+  {
+    "path": "npu/ragged-softmax/verified-v23/solution/op_kernel/rsm_solution_tiling.h",
+    "source": "submissions/rsm-v23-final-verified.zip!solution/op_kernel/rsm_solution_tiling.h",
+    "sha256": "83f9e4f436134e1505192ce7f3e981a2c7c78a7d824da9ef99838c315bff51e4"
+  },
+  {
+    "path": "npu/ragged-softmax/verified-v23/solution/runner/main.cpp",
+    "source": "submissions/rsm-v23-final-verified.zip!solution/runner/main.cpp",
+    "sha256": "8907ae4ada247b258925350e3f3258e8cad0ec2281e6259e56b96602926ec5a8"
+  },
+  {
+    "path": "npu/ragged-softmax/candidate-v25/solution/CMakeLists.txt",
+    "source": "submissions/rsm-v25-balanced-untested.zip!solution/CMakeLists.txt",
+    "sha256": "68b33d6ab3616a6d388537282d10204417debcb3cff4fbffed477fc25657ba52"
+  },
+  {
+    "path": "npu/ragged-softmax/candidate-v25/solution/op_host/rsm_solution_host.cpp",
+    "source": "submissions/rsm-v25-balanced-untested.zip!solution/op_host/rsm_solution_host.cpp",
+    "sha256": "efab5e3905ca17436f4732d6f1d6f3c0e2d13436a8660c69f4e69afe8173cff7"
+  },
+  {
+    "path": "npu/ragged-softmax/candidate-v25/solution/op_host/rsm_solution_host.h",
+    "source": "submissions/rsm-v25-balanced-untested.zip!solution/op_host/rsm_solution_host.h",
+    "sha256": "b8b00045773cc9b0606e19dc51064629c52eacefa533a616067f07dac8f02126"
+  },
+  {
+    "path": "npu/ragged-softmax/candidate-v25/solution/op_kernel/rsm_solution.cpp",
+    "source": "submissions/rsm-v25-balanced-untested.zip!solution/op_kernel/rsm_solution.cpp",
+    "sha256": "c96a678369a67742b23ca50588cb007858408e55e560d6ce7eabc03b56b28777"
+  },
+  {
+    "path": "npu/ragged-softmax/candidate-v25/solution/op_kernel/rsm_solution_core.h",
+    "source": "submissions/rsm-v25-balanced-untested.zip!solution/op_kernel/rsm_solution_core.h",
+    "sha256": "7bb9f0c7c5104a3f6b9aacee570b25707c77740c6337b4a11d748519160b5a69"
+  },
+  {
+    "path": "npu/ragged-softmax/candidate-v25/solution/op_kernel/rsm_solution_tiling.h",
+    "source": "submissions/rsm-v25-balanced-untested.zip!solution/op_kernel/rsm_solution_tiling.h",
+    "sha256": "83f9e4f436134e1505192ce7f3e981a2c7c78a7d824da9ef99838c315bff51e4"
+  },
+  {
+    "path": "npu/ragged-softmax/candidate-v25/solution/runner/main.cpp",
+    "source": "submissions/rsm-v25-balanced-untested.zip!solution/runner/main.cpp",
+    "sha256": "8907ae4ada247b258925350e3f3258e8cad0ec2281e6259e56b96602926ec5a8"
+  },
+  {
+    "path": "cpu/blackhole/optimization.patch",
+    "source": "solutions/blackhole/submission.zip compared with 08-blackhole",
+    "sha256": "c2cdf7d26e0b744cabc7cf76f6b5ffacfde07f5573ac07ffaad62b744d206fae"
+  },
+  {
+    "path": "cpu/mahjx/optimization.patch",
+    "source": "solutions/mahjx/submission-tested-414s.zip compared with 09-mahjx",
+    "sha256": "6e866f755cfc1915a93587d7e70279aadd6870e22626baf1c0ff1fd8e1e3f273"
+  }
+]

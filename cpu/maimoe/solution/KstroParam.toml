@@ -1,0 +1,11 @@
+cpu_workers = 8
+input_readers = 0
+prefetch_depth = 0
+compute_batch = 16
+pipeline_mib = 64
+io_workers = 0
+write_batch = 16
+queue_partitions = 1
+partition_steal = "shared"
+schedule_policy = "manifest"
+schedule_hybrid_weight = 100

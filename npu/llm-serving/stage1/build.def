@@ -1,0 +1,21 @@
+Bootstrap: docker
+From: quay.io/ascend/vllm-ascend@sha256:4ee78def8f33d59d48f116d1dfa793332c23c99ecab4f0d7dd5cd62d0fb4e6c1
+
+%labels
+    org.hellohpc.purpose "ascend-llm-inference"
+
+%environment
+    export PYTHONUNBUFFERED=1
+
+%post
+    set -eu
+    # vLLM Ascend v0.23.0, pinned to the ARM64 image manifest.
+    # Model weights are mounted by the evaluator, never included here.
+    python3 -c 'import importlib.metadata as m; print(m.version("vllm")); print(m.version("vllm-ascend"))'
+
+%test
+    set -eu
+    command -v python3
+    # Stage0 intentionally has no host driver mounted. Check installed packages
+    # here; NPU backend loading is validated with the real driver in Stage1.
+    python3 -c 'import importlib.metadata as m; [print(p, m.version(p)) for p in ("torch", "torch-npu", "vllm", "vllm-ascend")]'

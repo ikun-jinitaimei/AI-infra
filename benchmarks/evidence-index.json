@@ -1,0 +1,80 @@
+[
+  {
+    "export": "benchmarks/evidence/accelerate-final.json",
+    "source_record": "solutions/accelerate/outputs/q16-poly-double-bounds-large-b.json",
+    "source_sha256": "01b339a8e92e1754db7932c54a3f5ab31e183422be18a7074679943f87d4e873",
+    "processing": "Selected result fields only; infrastructure identifiers and input data excluded."
+  },
+  {
+    "export": "benchmarks/evidence/maimoe-final.json",
+    "source_record": "solutions/maimoe/outputs/optimization/outputs/test-20260928-032339.json",
+    "source_sha256": "90c2ade5f76c76d18ef015917605f4f79f66d205f25698ad7b80c74dc204bc62",
+    "processing": "Selected result fields only; infrastructure identifiers and input data excluded."
+  },
+  {
+    "export": "benchmarks/evidence/blackhole-final.json",
+    "source_record": "solutions/bh-mahj-experiments/final-validation-summary.json",
+    "source_sha256": "26f9227fe4eb4ef5b49c471378357a95d66bd3f5c336eb2a5d8ee4ebbe2125db",
+    "processing": "Selected result fields only; infrastructure identifiers and input data excluded."
+  },
+  {
+    "export": "benchmarks/evidence/mahjx-final.json",
+    "source_record": "solutions/bh-mahj-experiments/final-validation-summary.json",
+    "source_sha256": "26f9227fe4eb4ef5b49c471378357a95d66bd3f5c336eb2a5d8ee4ebbe2125db",
+    "processing": "Selected result fields only; infrastructure identifiers and input data excluded."
+  },
+  {
+    "export": "benchmarks/evidence/rune-official-64.json",
+    "source_record": "solutions/rune/outputs/official-64/summary.json",
+    "source_sha256": "fdc3f18d48d3c74780c482596d0f0d71aee0cf581a7f3650ee63e5da485ec63f",
+    "processing": "Selected result fields only; infrastructure identifiers and input data excluded."
+  },
+  {
+    "export": "benchmarks/evidence/rune-perturbed-16.json",
+    "source_record": "solutions/rune/outputs/perturbed-16/summary.json",
+    "source_sha256": "a193fb5892748e53b90ec454e2cacfdf05d573f11254f56840c7085cba5f9796",
+    "processing": "Selected result fields only; infrastructure identifiers and input data excluded."
+  },
+  {
+    "export": "benchmarks/evidence/rsm-v15.json",
+    "source_record": "solutions/ragged-softmax/outputs/v15/result.json",
+    "source_sha256": "d61bd4df33bae01195fc70f42b0798b9d5485a0bd68cef46f076bc2720f8ef4b",
+    "processing": "Selected result fields only; infrastructure identifiers and input data excluded."
+  },
+  {
+    "export": "benchmarks/evidence/rsm-v16.json",
+    "source_record": "solutions/ragged-softmax/outputs/v16/result.json",
+    "source_sha256": "56ad5850e6baace973ceafe7eadb366cea1ebef5d8c64ef30077a0db97c27794",
+    "processing": "Selected result fields only; infrastructure identifiers and input data excluded."
+  },
+  {
+    "export": "benchmarks/evidence/rsm-v17.json",
+    "source_record": "solutions/ragged-softmax/outputs/v17/result.json",
+    "source_sha256": "4aa93e38e94388a6ddcfd649790406110f325b15d7508e953f22e7cf7fef9679",
+    "processing": "Selected result fields only; infrastructure identifiers and input data excluded."
+  },
+  {
+    "export": "benchmarks/evidence/rsm-v19.json",
+    "source_record": "solutions/ragged-softmax/outputs/v19/result.json",
+    "source_sha256": "c2054d73a6a1fa6b333a73c0c5eac6de02d298a6e43174c3030e29802ccd4386",
+    "processing": "Selected result fields only; infrastructure identifiers and input data excluded."
+  },
+  {
+    "export": "benchmarks/evidence/rsm-v20.json",
+    "source_record": "solutions/ragged-softmax/outputs/v20/result.json",
+    "source_sha256": "41821eb0c0ca2b9c48302103281c651a646eb6c7d7d0bf15e6346713b53d8d63",
+    "processing": "Selected result fields only; infrastructure identifiers and input data excluded."
+  },
+  {
+    "export": "benchmarks/evidence/rsm-v21.json",
+    "source_record": "solutions/ragged-softmax/outputs/v21/result.json",
+    "source_sha256": "a60aad29347f8abe4e5ef9ff102ed858da3a3bf052dd7e8357f651f2a302d036",
+    "processing": "Selected result fields only; infrastructure identifiers and input data excluded."
+  },
+  {
+    "export": "benchmarks/evidence/rsm-v23.json",
+    "source_record": "solutions/ragged-softmax/outputs/v23/result.json",
+    "source_sha256": "6ee90922b84d798af27eca210383360567f0854ea44df69d70b92edbc8f15875",
+    "processing": "Selected result fields only; infrastructure identifiers and input data excluded."
+  }
+]
