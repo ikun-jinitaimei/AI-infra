@@ -2,52 +2,72 @@
   {
     "path": "LICENSE",
     "source": "references/hellohpc-2nd/LICENSE",
-    "sha256": "047d2259741a3ebb30d8c8a43d4ba79b5b229a069acd1d2bea49f22b297d8e98"
+    "sha256": "1349a4b6148492b44f629e64eed676612e234fe9a839e4f3b277c1482c8849f1",
+    "source_bytes_sha256": "047d2259741a3ebb30d8c8a43d4ba79b5b229a069acd1d2bea49f22b297d8e98",
+    "normalization": "CRLF to LF"
   },
   {
     "path": "cpu/accelerate/src/solver.py",
     "source": "solutions/accelerate/src/solver.py",
-    "sha256": "0e38b42dad7cb6afa80ff352b80ac4a9f027e4a1ddc5e0465f7eb98b625cf86c"
+    "sha256": "21c843db3268edeb4238afdd37e5db0217c8241a7323619bac381f7e97d690da",
+    "source_bytes_sha256": "0e38b42dad7cb6afa80ff352b80ac4a9f027e4a1ddc5e0465f7eb98b625cf86c",
+    "normalization": "CRLF to LF"
   },
   {
     "path": "cpu/accelerate/env.sh",
     "source": "solutions/accelerate/env.sh",
-    "sha256": "94ca40ba4606768d1e115031776621946d7b4af239a8e586dbd58b5b117f3584"
+    "sha256": "62257f5b3290bee49c2d80d73c3e5dc65496f243be80a5fb2da7cd14b8206c6e",
+    "source_bytes_sha256": "94ca40ba4606768d1e115031776621946d7b4af239a8e586dbd58b5b117f3584",
+    "normalization": "CRLF to LF"
   },
   {
     "path": "cpu/miniclash/source_code/block0.cpp",
     "source": "solutions/miniclash/source_code/block0.cpp",
-    "sha256": "249fe9de8328878c7608e9e8eabd9a7fb68b3e461e9fe766bc1b6fdfa1c917c2"
+    "sha256": "31f56c6deec6dd3bd4c70fcc1e5f02a60f8e457d810a355408c7e311072008cd",
+    "source_bytes_sha256": "249fe9de8328878c7608e9e8eabd9a7fb68b3e461e9fe766bc1b6fdfa1c917c2",
+    "normalization": "CRLF to LF"
   },
   {
     "path": "cpu/miniclash/source_code/block1.cpp",
     "source": "solutions/miniclash/source_code/block1.cpp",
-    "sha256": "acdf8ba96fdf997af9caa929c29ae3201c05ebcb06a4b6a283052ee43665b624"
+    "sha256": "8e5c24931db0665669c432aafa0694b848768056d442cf47324c3503440d6747",
+    "source_bytes_sha256": "acdf8ba96fdf997af9caa929c29ae3201c05ebcb06a4b6a283052ee43665b624",
+    "normalization": "CRLF to LF"
   },
   {
     "path": "cpu/miniclash/source_code/block1stevens00.cpp",
     "source": "solutions/miniclash/source_code/block1stevens00.cpp",
-    "sha256": "a670bd099ef3123ce632443a427f9109743694ed6adbe850af232fd90201080d"
+    "sha256": "538c9ae99e99bca2f38fa8b06388dc66111e24c3d342fb3e2e95c14caf6ccc18",
+    "source_bytes_sha256": "a670bd099ef3123ce632443a427f9109743694ed6adbe850af232fd90201080d",
+    "normalization": "CRLF to LF"
   },
   {
     "path": "cpu/miniclash/source_code/block1stevens01.cpp",
     "source": "solutions/miniclash/source_code/block1stevens01.cpp",
-    "sha256": "9790d784ccb4195c49851492a213626554112adb0a39e605fe327f357b23a0fb"
+    "sha256": "ac568ae5ecdcd89a5014bad42895eae71c92cb38e82367f4d040a810181ca640",
+    "source_bytes_sha256": "9790d784ccb4195c49851492a213626554112adb0a39e605fe327f357b23a0fb",
+    "normalization": "CRLF to LF"
   },
   {
     "path": "cpu/miniclash/source_code/block1stevens10.cpp",
     "source": "solutions/miniclash/source_code/block1stevens10.cpp",
-    "sha256": "e825d010e1649f25021d82fe17e0632ca69da841bc9810945bd837bb592c0451"
+    "sha256": "977fd6403c52ff68f963646cd909e9f0796bc963d3a4d4978185bcb80c27e245",
+    "source_bytes_sha256": "e825d010e1649f25021d82fe17e0632ca69da841bc9810945bd837bb592c0451",
+    "normalization": "CRLF to LF"
   },
   {
     "path": "cpu/miniclash/source_code/block1stevens11.cpp",
     "source": "solutions/miniclash/source_code/block1stevens11.cpp",
-    "sha256": "a5ac624698779ebff6d9e5cc8eafc5a90f9c73d4ec2311bb3ce4265f622836c6"
+    "sha256": "24fe014efcfadcddef0db562d7dac107b00fd8c8c060cd26b89d0b2ce9a1ed3a",
+    "source_bytes_sha256": "a5ac624698779ebff6d9e5cc8eafc5a90f9c73d4ec2311bb3ce4265f622836c6",
+    "normalization": "CRLF to LF"
   },
   {
     "path": "cpu/miniclash/source_code/block1wang.cpp",
     "source": "solutions/miniclash/source_code/block1wang.cpp",
-    "sha256": "a2207e1096a268feac0b3fd2d0d5299b391272802394ec98827505ca663c88ae"
+    "sha256": "b91d9491f0f019e727937e9560aedbc6dd2ef8c615bd99210869d7f422cc27b4",
+    "source_bytes_sha256": "a2207e1096a268feac0b3fd2d0d5299b391272802394ec98827505ca663c88ae",
+    "normalization": "CRLF to LF"
   },
   {
     "path": "cpu/miniclash/source_code/dispatch.py",
@@ -57,27 +77,37 @@
   {
     "path": "cpu/miniclash/source_code/LICENSE.txt",
     "source": "solutions/miniclash/source_code/LICENSE.txt",
-    "sha256": "185939279ca77fb5ed558391bc1b75d3c27b9b1a2bda4f32db0ee2a5e3914de2"
+    "sha256": "6b0e9a9c3ac80eff61a7748e90f7b9595393ded1f45c7cb4e511b557c193c975",
+    "source_bytes_sha256": "185939279ca77fb5ed558391bc1b75d3c27b9b1a2bda4f32db0ee2a5e3914de2",
+    "normalization": "CRLF to LF"
   },
   {
     "path": "cpu/miniclash/source_code/main.cpp",
     "source": "solutions/miniclash/source_code/main.cpp",
-    "sha256": "0d84cb386c8c6dca83e1b73e6f415e736ea6ea0a9cbfab740e394470947cccf7"
+    "sha256": "959523ff24218b883bb3eeaaa09575877a077330a7bc22c5b9012fd311771110",
+    "source_bytes_sha256": "0d84cb386c8c6dca83e1b73e6f415e736ea6ea0a9cbfab740e394470947cccf7",
+    "normalization": "CRLF to LF"
   },
   {
     "path": "cpu/miniclash/source_code/main.hpp",
     "source": "solutions/miniclash/source_code/main.hpp",
-    "sha256": "d84accd6676597b3207c088b4048f58cae69eee27a268457e4d32363feae4670"
+    "sha256": "8e77d5db39fcd1f808738e208b0f24c1593b96a5e0ca8a68eaf1692dba6f0f3e",
+    "source_bytes_sha256": "d84accd6676597b3207c088b4048f58cae69eee27a268457e4d32363feae4670",
+    "normalization": "CRLF to LF"
   },
   {
     "path": "cpu/miniclash/source_code/Makefile",
     "source": "solutions/miniclash/source_code/Makefile",
-    "sha256": "781b3032a5a6ba30defed9a3cb965dba6a81f0b5fa1d8c831ef1f1d2274c74a4"
+    "sha256": "927d385442e952b6e663ff394f6cb254172fb65b55a219ef9760a8ebccb3dbb8",
+    "source_bytes_sha256": "781b3032a5a6ba30defed9a3cb965dba6a81f0b5fa1d8c831ef1f1d2274c74a4",
+    "normalization": "CRLF to LF"
   },
   {
     "path": "cpu/miniclash/source_code/md5.cpp",
     "source": "solutions/miniclash/source_code/md5.cpp",
-    "sha256": "8b963fb7678cb882befd158724c8f66734c0e2c22fb686c900902377aa5442ae"
+    "sha256": "74a38ceece47249a98e24380924e8358e49ec68cfcb63df9bd2f6cf5a65c723d",
+    "source_bytes_sha256": "8b963fb7678cb882befd158724c8f66734c0e2c22fb686c900902377aa5442ae",
+    "normalization": "CRLF to LF"
   },
   {
     "path": "cpu/miniclash/source_code/run-serial.sh",
@@ -92,27 +122,37 @@
   {
     "path": "cpu/miniclash/source_code/timer.cpp",
     "source": "solutions/miniclash/source_code/timer.cpp",
-    "sha256": "a6f16cc8cfff93a58bb02f8005e4e19bf6a1e3f881315c498a41582af79a14a3"
+    "sha256": "8279970dbad74efdcc2180a7288555b4ed74aa49c1c1600afefa50064f7e80c5",
+    "source_bytes_sha256": "a6f16cc8cfff93a58bb02f8005e4e19bf6a1e3f881315c498a41582af79a14a3",
+    "normalization": "CRLF to LF"
   },
   {
     "path": "cpu/miniclash/source_code/timer.hpp",
     "source": "solutions/miniclash/source_code/timer.hpp",
-    "sha256": "a417341b8400ae9a3dea8859144b207f8fa7fc81649e58e4319031930ce4ab0f"
+    "sha256": "a1d57c5550b8dd2c14110984bc6ad0fc05dd6515a809e2869dffd29a7a0de9a6",
+    "source_bytes_sha256": "a417341b8400ae9a3dea8859144b207f8fa7fc81649e58e4319031930ce4ab0f",
+    "normalization": "CRLF to LF"
   },
   {
     "path": "cpu/miniclash/source_code/types.hpp",
     "source": "solutions/miniclash/source_code/types.hpp",
-    "sha256": "5d6c5bc454469c37d5863c2bfa5bcbe280b03b2c375ce3f31ef55bba2c857ec6"
+    "sha256": "2bed96c79df0995259215cedb101c08c00b4e19d5a2c20f54bf28ab0b68fb72d",
+    "source_bytes_sha256": "5d6c5bc454469c37d5863c2bfa5bcbe280b03b2c375ce3f31ef55bba2c857ec6",
+    "normalization": "CRLF to LF"
   },
   {
     "path": "cpu/rune/policy.py",
     "source": "solutions/rune/policy.py",
-    "sha256": "a1e0835efd4c7b885d3dc6e220d6cd14d87afbdb316ac9c1dbc46e64468d308f"
+    "sha256": "646ec5ba51598d39cd38987efa4348209db7dbde236799460365d58f5b4ddc51",
+    "source_bytes_sha256": "a1e0835efd4c7b885d3dc6e220d6cd14d87afbdb316ac9c1dbc46e64468d308f",
+    "normalization": "CRLF to LF"
   },
   {
     "path": "npu/llm-serving/stage1/build.def",
     "source": "solutions/llm-serving/submission/build.def",
-    "sha256": "b30ca9c230d76f08824f28bdca9fa71f356db3b05cff20b11c4579d19b650c1f"
+    "sha256": "eaa63ffb087c254cd69ec590013498404438847391d79ee9c5183e5d0fb1b0c3",
+    "source_bytes_sha256": "b30ca9c230d76f08824f28bdca9fa71f356db3b05cff20b11c4579d19b650c1f",
+    "normalization": "CRLF to LF"
   },
   {
     "path": "npu/llm-serving/stage1/start.sh",
@@ -147,17 +187,23 @@
   {
     "path": "npu/ragged-softmax/verified-v23/solution/CMakeLists.txt",
     "source": "submissions/rsm-v23-final-verified.zip!solution/CMakeLists.txt",
-    "sha256": "68b33d6ab3616a6d388537282d10204417debcb3cff4fbffed477fc25657ba52"
+    "sha256": "1767f2e1fb1b15e226b6a45fdb3cd1a362fc3953619a999daf9a9575c63d3f99",
+    "source_bytes_sha256": "68b33d6ab3616a6d388537282d10204417debcb3cff4fbffed477fc25657ba52",
+    "normalization": "CRLF to LF"
   },
   {
     "path": "npu/ragged-softmax/verified-v23/solution/op_host/rsm_solution_host.cpp",
     "source": "submissions/rsm-v23-final-verified.zip!solution/op_host/rsm_solution_host.cpp",
-    "sha256": "efab5e3905ca17436f4732d6f1d6f3c0e2d13436a8660c69f4e69afe8173cff7"
+    "sha256": "b59b90da3e33979e988c76ea1b21e5795447ff4ea3a5ce8ad6640e83320ed4c7",
+    "source_bytes_sha256": "efab5e3905ca17436f4732d6f1d6f3c0e2d13436a8660c69f4e69afe8173cff7",
+    "normalization": "CRLF to LF"
   },
   {
     "path": "npu/ragged-softmax/verified-v23/solution/op_host/rsm_solution_host.h",
     "source": "submissions/rsm-v23-final-verified.zip!solution/op_host/rsm_solution_host.h",
-    "sha256": "b8b00045773cc9b0606e19dc51064629c52eacefa533a616067f07dac8f02126"
+    "sha256": "9777a22f727ea9e9ad5a3c716a56f99b0c33cfb0257bddc513896a558e3c6a2c",
+    "source_bytes_sha256": "b8b00045773cc9b0606e19dc51064629c52eacefa533a616067f07dac8f02126",
+    "normalization": "CRLF to LF"
   },
   {
     "path": "npu/ragged-softmax/verified-v23/solution/op_kernel/rsm_solution.cpp",
@@ -172,27 +218,37 @@
   {
     "path": "npu/ragged-softmax/verified-v23/solution/op_kernel/rsm_solution_tiling.h",
     "source": "submissions/rsm-v23-final-verified.zip!solution/op_kernel/rsm_solution_tiling.h",
-    "sha256": "83f9e4f436134e1505192ce7f3e981a2c7c78a7d824da9ef99838c315bff51e4"
+    "sha256": "275700dbfa95a753859527e8359da4555277f6c80980c0b82c21701df78e7250",
+    "source_bytes_sha256": "83f9e4f436134e1505192ce7f3e981a2c7c78a7d824da9ef99838c315bff51e4",
+    "normalization": "CRLF to LF"
   },
   {
     "path": "npu/ragged-softmax/verified-v23/solution/runner/main.cpp",
     "source": "submissions/rsm-v23-final-verified.zip!solution/runner/main.cpp",
-    "sha256": "8907ae4ada247b258925350e3f3258e8cad0ec2281e6259e56b96602926ec5a8"
+    "sha256": "2f5ffb1209c1da4809bf37e3e7760cfd2d4c6684e54d11bd5aa2b8b664f4a7dc",
+    "source_bytes_sha256": "8907ae4ada247b258925350e3f3258e8cad0ec2281e6259e56b96602926ec5a8",
+    "normalization": "CRLF to LF"
   },
   {
     "path": "npu/ragged-softmax/candidate-v25/solution/CMakeLists.txt",
     "source": "submissions/rsm-v25-balanced-untested.zip!solution/CMakeLists.txt",
-    "sha256": "68b33d6ab3616a6d388537282d10204417debcb3cff4fbffed477fc25657ba52"
+    "sha256": "1767f2e1fb1b15e226b6a45fdb3cd1a362fc3953619a999daf9a9575c63d3f99",
+    "source_bytes_sha256": "68b33d6ab3616a6d388537282d10204417debcb3cff4fbffed477fc25657ba52",
+    "normalization": "CRLF to LF"
   },
   {
     "path": "npu/ragged-softmax/candidate-v25/solution/op_host/rsm_solution_host.cpp",
     "source": "submissions/rsm-v25-balanced-untested.zip!solution/op_host/rsm_solution_host.cpp",
-    "sha256": "efab5e3905ca17436f4732d6f1d6f3c0e2d13436a8660c69f4e69afe8173cff7"
+    "sha256": "b59b90da3e33979e988c76ea1b21e5795447ff4ea3a5ce8ad6640e83320ed4c7",
+    "source_bytes_sha256": "efab5e3905ca17436f4732d6f1d6f3c0e2d13436a8660c69f4e69afe8173cff7",
+    "normalization": "CRLF to LF"
   },
   {
     "path": "npu/ragged-softmax/candidate-v25/solution/op_host/rsm_solution_host.h",
     "source": "submissions/rsm-v25-balanced-untested.zip!solution/op_host/rsm_solution_host.h",
-    "sha256": "b8b00045773cc9b0606e19dc51064629c52eacefa533a616067f07dac8f02126"
+    "sha256": "9777a22f727ea9e9ad5a3c716a56f99b0c33cfb0257bddc513896a558e3c6a2c",
+    "source_bytes_sha256": "b8b00045773cc9b0606e19dc51064629c52eacefa533a616067f07dac8f02126",
+    "normalization": "CRLF to LF"
   },
   {
     "path": "npu/ragged-softmax/candidate-v25/solution/op_kernel/rsm_solution.cpp",
@@ -207,12 +263,16 @@
   {
     "path": "npu/ragged-softmax/candidate-v25/solution/op_kernel/rsm_solution_tiling.h",
     "source": "submissions/rsm-v25-balanced-untested.zip!solution/op_kernel/rsm_solution_tiling.h",
-    "sha256": "83f9e4f436134e1505192ce7f3e981a2c7c78a7d824da9ef99838c315bff51e4"
+    "sha256": "275700dbfa95a753859527e8359da4555277f6c80980c0b82c21701df78e7250",
+    "source_bytes_sha256": "83f9e4f436134e1505192ce7f3e981a2c7c78a7d824da9ef99838c315bff51e4",
+    "normalization": "CRLF to LF"
   },
   {
     "path": "npu/ragged-softmax/candidate-v25/solution/runner/main.cpp",
     "source": "submissions/rsm-v25-balanced-untested.zip!solution/runner/main.cpp",
-    "sha256": "8907ae4ada247b258925350e3f3258e8cad0ec2281e6259e56b96602926ec5a8"
+    "sha256": "2f5ffb1209c1da4809bf37e3e7760cfd2d4c6684e54d11bd5aa2b8b664f4a7dc",
+    "source_bytes_sha256": "8907ae4ada247b258925350e3f3258e8cad0ec2281e6259e56b96602926ec5a8",
+    "normalization": "CRLF to LF"
   },
   {
     "path": "cpu/blackhole/optimization.patch",
