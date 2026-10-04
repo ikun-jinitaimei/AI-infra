@@ -24,7 +24,7 @@ An evidence-driven learning project bridging scientific Python and AI systems: C
 | 项目 | Baseline / 待解决问题 | 优化与预期机制 | 已有结果 |
 |---|---|---|---|
 | [MaiMoe](cpu/maimoe/) | 接手实现重复解析、字符串构造及哈希工作 | 紧凑事件、复用前缀、ARM SHA、NEON渲染；减少重复运算及分配 | 最大样例3706.430→616.737 ms，约6.01×；四组检查通过 |
-| [Miniclash](cpu/miniclash/) | 标量候选搜索；每个候选有相似整数运算 | 多条NEON指令批处理候选；保持筛选语义 | 固定种子微测量：标量约27.53 s→双块16路约15.64 s；不是端到端同等加速证明 |
+| [Miniclash](cpu/miniclash/) | 标量候选搜索；每个候选有相似整数运算 | 多条NEON指令批处理候选；保持筛选语义 | 同轮固定种子微测量：8路19.3977 s→16路15.7171 s，约1.23×；端到端收益另测 |
 | [Accelerate](cpu/accelerate/) | 查询×中心的距离、点积、sin/exp计算开销 | 查询分块、NEON双精度、向量数学、范围检查外提、OpenMP | 最终公开large-b三次最慢1178.475 ms；正确性通过 |
 | [RSM](npu/ragged-softmax/) | 独立处理短段，DMA、归约和标量交互重复 | 连续段缓存、联合短段、融合softmax、Gather | v23公开综合加速比5.303×；完整公开检查通过 |
 | [Blackhole](cpu/blackhole/) | 重复插值模板与权重、场数据复制和通信 | 模板复用、MPI共享窗口、NEON与分阶段Fourier收缩 | 四例完整数值检查通过；huge 26.991 s；没有匹配baseline时间，不补造加速比 |
@@ -86,3 +86,9 @@ docs/                      优化案例、结果口径、学习地图、复现�
 上游为 [HPC-SJTU/hellohpc-2nd](https://github.com/HPC-SJTU/hellohpc-2nd)，参考commit为 `d7e85db2c403528479c47771c0ab65198a07c18e`。保留CC BY-NC-SA 4.0许可文本及第三方独立许可，例如Miniclash的MIT许可。
 
 接下来值得补充的是受控的硬件计数器测量、线程扩展曲线、单一变量消融和独立复现脚本。它们列在学习计划中，不作为已经完成的内容。当前仓库的价值是保存一个有成功、失败与证据限制的性能工程闭环。
+
+## 按案例阅读与检查
+
+各题目录现在都有 README，按“问题与起点 → 假设与修改 → 验证与限制 → 学习重点”组织。完整阶段表与同轮/跨轮比较边界见 [优化演进](docs/optimization-history.md)，MaiMoe 的阶段数据另提供 [CSV](benchmarks/progression.csv)。
+
+可以先执行 `python tools/check_repository.py` 检查导出源码摘要、相对文档链接和意外的大型产物。这只验证仓库文件一致性，不运行 ARM/NPU 性能测试。更详细的后续实验方向见 [学习路线](docs/learning-roadmap.md)。
