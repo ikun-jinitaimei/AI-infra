@@ -1,0 +1,641 @@
+--- a/run.sh
++++ b/run.sh
+@@ -4,6 +4,11 @@
+ module load hpckit/26.1.RC1
+ module load gcc/compiler12.3.1/gccmodule
+ 
++export OMP_NUM_THREADS=${OMP_NUM_THREADS:-128}
++export OMP_PROC_BIND=${OMP_PROC_BIND:-close}
++export OMP_PLACES=${OMP_PLACES:-cores}
++export GOMP_SPINCOUNT=${GOMP_SPINCOUNT:-300000}
++
+ setup_file=${1:?usage: run.sh <setup-file>}
+ 
+ exec ./src/system full_analyze "$setup_file" 15
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -6,13 +6,13 @@
+ ARCH_CFLAGS = -mcmodel=medium
+ ARCH_LDFLAGS =
+ else ifeq ($(ARCH),aarch64)
+-ARCH_CFLAGS = -mcmodel=large -fno-pic -fno-pie -fsigned-char
++ARCH_CFLAGS = -mcmodel=large -fno-pic -fno-pie -fsigned-char -mcpu=tsv110
+ ARCH_LDFLAGS = -no-pie
+ else
+ $(error Unsupported architecture: $(ARCH))
+ endif
+ 
+-CFLAGS = -g -MMD -MP -std=c++11 -O3 -fopenmp -pthread -DNPROCS=$(NPROCS) -DBOOST_BIND_GLOBAL_PLACEHOLDERS $(ARCH_CFLAGS)
++CFLAGS = -MMD -MP -std=c++11 -Ofast -flto=8 -DNDEBUG -fopenmp -pthread -DNPROCS=$(NPROCS) -DBOOST_BIND_GLOBAL_PLACEHOLDERS $(ARCH_CFLAGS)
+ WFLAGS = -pedantic -Wignored-qualifiers -Wreturn-type -Wmaybe-uninitialized -Wbool-compare -Wshadow -Wunused-but-set-variable -Wunused-variable
+ LIBS = -lboost_system
+ 
+--- a/src/ai_src/hand_calculator_supplement.cpp
++++ b/src/ai_src/hand_calculator_supplement.cpp
+@@ -426,7 +426,7 @@
+         hand_calculator_work.points_exp_to_work[loc_first][loc_second][mod2tn] = 0.0;
+ 
+         double prob_tmpbest[38], tenpai_tmpbest[38], win_exp_tmpbest[38], exp_tmpbest[38];
+-        std::vector<sparsemax_bellman::Candidate> tsumo_candidates[38];
++        sparsemax_bellman::Candidates tsumo_candidates[38];
+         for (int tile = 0; tile < 38; tile++) {
+           if (tile % 10 != 0) {
+             if (cal_proto_sequence_value[loc_first][loc_second].get_riichi() == 1) {
+@@ -566,7 +566,7 @@
+                 hand_calculator_work.points_exp_to_work[loc_first][loc_second][mod2tn]};
+             const sparsemax_bellman::Record fold = {
+                 0.0, 0.0, 0.0, hand_calculator_work.fold_exp_work[loc_first][loc_second]};
+-            std::vector<sparsemax_bellman::Candidate> choices;
++            sparsemax_bellman::Candidates choices;
+             choices.push_back(sparsemax_bellman::Candidate(play));
+             choices.push_back(sparsemax_bellman::Candidate(fold));
+             sparsemax_bellman::assign(
+@@ -604,7 +604,7 @@
+               hand_calculator_work.win_exp_to_work[loc_first][loc_second][mod2tn],
+               hand_calculator_work.tenpai_prob_to_work[loc_first][loc_second][mod2tn],
+               hand_calculator_work.points_exp_to_work[loc_first][loc_second][mod2tn]};
+-          std::vector<sparsemax_bellman::Candidate> ron_candidates[38];
++          sparsemax_bellman::Candidates ron_candidates[38];
+           for (int tile = 1; tile < 38; ++tile) {
+             if (tile % 10 != 0)
+               ron_candidates[tile].push_back(sparsemax_bellman::Candidate(baseline, 1.0, 0.0));
+@@ -722,7 +722,7 @@
+                 hand_calculator_work.points_exp_work[loc_first][loc_second][mod2tn]};
+             const sparsemax_bellman::Record fold = {
+                 0.0, 0.0, 0.0, hand_calculator_work.fold_exp_work[loc_first][loc_second]};
+-            std::vector<sparsemax_bellman::Candidate> choices;
++            sparsemax_bellman::Candidates choices;
+             choices.push_back(sparsemax_bellman::Candidate(play));
+             choices.push_back(sparsemax_bellman::Candidate(fold));
+             sparsemax_bellman::assign(
+--- a/src/ai_src/selector.cpp
++++ b/src/ai_src/selector.cpp
+@@ -112,10 +112,21 @@
+   }
+   const int ranking_model_round = game_state.ranking_model_round;
+   const int dealer_id = get_dealer(game_record);
++  std::array<int,17> cache_key;
++  int ck=0;
++  cache_key[ck++]=ranking_model_round;cache_key[ck++]=dealer_id;
++  cache_key[ck++]=game_state.repeat_counter;cache_key[ck++]=game_state.deposit;cache_key[ck++]=my_pid;
++  for(int pid=0;pid<4;++pid)cache_key[ck++]=game_state.player_state[pid].score;
++  for(int pid=0;pid<4;++pid)cache_key[ck++]=(game_state.player_state[pid].riichi_declared||(pid==my_pid&&riichi_mode))&&!game_state.player_state[pid].riichi_accepted;
++  for(int v:tactics.turn_pt)cache_key[ck++]=v;
++  struct Cached {bool valid=false;std::array<int,17> key;std::array<std::array<std::array<std::array<float, 12>, 14>, 4>, 4> value;};
++  static std::array<Cached,8> cached;
++  auto &entry=cached[2*my_pid+int(riichi_mode)];
++  if(entry.valid&&entry.key==cache_key)return entry.value;
++
+ 
+   std::array<std::array<std::array<std::array<float, 12>, 14>, 4>, 4> round_end_pt_exp = {};
+-#pragma omp parallel
+-#pragma omp for
++#pragma omp parallel for collapse(2) num_threads(std::min(16,omp_get_max_threads()))
+   for (int pid1 = 0; pid1 < 4; pid1++) {
+     for (int pid2 = 0; pid2 < 4; pid2++) {
+       for (int han = 1; han <= 13; han++) {
+@@ -173,6 +184,7 @@
+       }
+     }
+   }
++  entry.key=cache_key;entry.value=round_end_pt_exp;entry.valid=true;
+   return round_end_pt_exp;
+ }
+ 
+@@ -190,6 +202,18 @@
+   }
+   const int ranking_model_round = game_state.ranking_model_round;
+   const int dealer_id = get_dealer(game_record);
++  std::array<int,17> cache_key;
++  int ck=0;
++  cache_key[ck++]=ranking_model_round;cache_key[ck++]=dealer_id;
++  cache_key[ck++]=game_state.repeat_counter;cache_key[ck++]=game_state.deposit;cache_key[ck++]=my_pid;
++  for(int pid=0;pid<4;++pid)cache_key[ck++]=game_state.player_state[pid].score;
++  for(int pid=0;pid<4;++pid)cache_key[ck++]=(game_state.player_state[pid].riichi_declared||(pid==my_pid&&riichi_mode))&&!game_state.player_state[pid].riichi_accepted;
++  for(int v:tactics.turn_pt)cache_key[ck++]=v;
++  struct Cached {bool valid=false;std::array<int,17> key;std::array<std::array<std::array<std::array<float, 2>, 2>, 2>, 2> value;};
++  static std::array<Cached,8> cached;
++  auto &entry=cached[2*my_pid+int(riichi_mode)];
++  if(entry.valid&&entry.key==cache_key)return entry.value;
++
+ 
+   std::array<std::array<std::array<std::array<float, 2>, 2>, 2>, 2> drawn_round_pt_exp = {};
+ 
+@@ -226,6 +250,7 @@
+       }
+     }
+   }
++  entry.key=cache_key;entry.value=drawn_round_pt_exp;entry.valid=true;
+   return drawn_round_pt_exp;
+ }
+ 
+@@ -364,6 +389,13 @@
+ }
+ 
+ void Selector::set_selector(const Moves &game_record, const int my_pid, const Tactics &tactics) {
++#ifdef MAHJX_PROFILE
++  double stage_time=omp_get_wtime();
++  auto mark_stage=[&](const char *name){double now=omp_get_wtime();std::cerr<<"MAHJX_STAGE "<<name<<" "<<now-stage_time<<std::endl;stage_time=now;};
++#else
++  auto mark_stage=[](const char *){};
++#endif
++
+   tile_choice.clear();
+   open_meld_choice.clear();
+   const Game_State game_state = get_game_state(game_record);
+@@ -395,6 +427,7 @@
+           ? drawn_round_pt_exp
+           : cal_drawn_round_pt_exp(game_record, game_state, my_pid, true, tactics);
+ 
++  mark_stage("round_models");
+   if (console_out) {
+     std::cout << "drawn_round_pt_exp:" << std::endl;
+     for (int t0 = 0; t0 < 2; t0++) {
+@@ -450,6 +483,7 @@
+     std::cout << std::endl;
+   }
+ 
++  mark_stage("tenpai_models");
+   const std::pair<std::array<std::array<float, 38>, 4>, std::array<std::array<float, 38>, 4>>
+       deal_in_tile_prob_value =
+           cal_deal_in_tile_prob_value(tenpai_estimator, round_end_pt_exp, my_pid, false);
+@@ -658,17 +692,20 @@
+     }
+     std::cout << "candidates_num:" << hand_calculator.candidates_size() << std::endl;
+   }
++  mark_stage("prepare");
+   hand_calculator.set_candidates3_single_thread(
+       game_state, hand_analyzer, hand_analyzer_af,
+       std::max({hand_analyzer.meld_change_num_max, hand_analyzer.seven_pairs_change_num_max,
+                 hand_analyzer_af.meld_change_num_max}),
+       tactics);
++  mark_stage("single_candidates");
+   hand_analyzer.pattern = 0;
+ 
+   const std::array<bool, 38> discard_kind = get_discard_kind(game_state.player_state[my_pid].river);
+   hand_calculator.set_candidates3_multi_thread(game_record, game_state, discard_kind, hand_analyzer,
+                                                tactics);
+ 
++  mark_stage("multi_candidates");
+   const bool chii_action = current_action.type == EventType::DISCARD
+                                ? ((current_action.player + 1) % 4 == my_pid)
+                                : false;
+@@ -700,6 +737,7 @@
+                               round_end_pt_exp, drawn_round_pt_exp, drawn_round_pt_exp_ar, tactics);
+     }
+ 
++    mark_stage("dp");
+     if (current_action.type == EventType::DRAW) {
+       for (int cn = 0; cn < hand_calculator.in0num; cn++) {
+         for (int gn = 0; gn < hand_calculator.group_size(cn); gn++) {
+--- a/src/ai_src/simple_dp_sparsemax.hpp
++++ b/src/ai_src/simple_dp_sparsemax.hpp
+@@ -1,8 +1,10 @@
+ #pragma once
++#include "sparsemax_projection.hpp"
+ #include <algorithm>
+ #include <array>
+ #include <cstddef>
+ #include <vector>
++#include <boost/container/small_vector.hpp>
+ 
+ // This operator is deliberately separate from the full-DP operator.  In
+ // particular, the simplex score is points_exp only; the other fields are
+@@ -19,13 +21,14 @@
+   Candidate(const PointsRecord &r, double c = 1, double e = 1)
+       : record(r), coeff(c), event_weight(e) {}
+ };
+-inline std::vector<double> weights(const std::vector<Candidate> &c) {
+-  std::vector<double> p(c.size(), 0);
++template<class Candidates>
++inline boost::container::small_vector<double, 8> weights_inline(const Candidates &c) {
++  boost::container::small_vector<double, 8> p(c.size(), 0);
+   if (c.empty()) return p;
+   double m = c[0].record.points_exp;
+   for (std::size_t i = 1; i < c.size(); ++i) m = std::max(m, c[i].record.points_exp);
+   double theta = 0, prefix = 0;
+-  std::vector<std::size_t> order(c.size());
++  boost::container::small_vector<std::size_t, 8> order(c.size());
+   for (std::size_t i = 0; i < c.size(); ++i) {
+     order[i] = i;
+     for (std::size_t j = i; j && c[order[j]].record.points_exp > c[order[j - 1]].record.points_exp;
+@@ -42,28 +45,35 @@
+     p[i] = std::max(0.0, c[i].record.points_exp - m - theta);
+   return p;
+ }
+-inline PointsRecord mix(const std::vector<Candidate> &c) {
++inline std::vector<double> weights(const std::vector<Candidate> &c) {
++  auto p=weights_inline(c); return std::vector<double>(p.begin(),p.end());
++}
++typedef boost::container::small_vector<Candidate, 4> Candidates;
++
++template<class C>
++inline PointsRecord mix(const C &c) {
+   PointsRecord out{0, 0, {{0, 0, 0, 0, 0}}};
+-  auto p = weights(c);
++  const auto projection=sparsemax_projection::project(c,1.0);
+   for (std::size_t i = 0; i < c.size(); ++i) {
+-    out.win_prob += p[i] * c[i].record.win_prob;
+-    out.points_exp += p[i] * c[i].record.points_exp;
+-    for (int h = 0; h < 5; ++h) out.han[h] += p[i] * c[i].record.han[h];
++    out.win_prob += projection.weight(c[i].record.points_exp) * c[i].record.win_prob;
++    out.points_exp += projection.weight(c[i].record.points_exp) * c[i].record.points_exp;
++    for (int h = 0; h < 5; ++h) out.han[h] += projection.weight(c[i].record.points_exp) * c[i].record.han[h];
+   }
+   return out;
+ }
+-inline PointsRecord mix_delta(const std::vector<Candidate> &c, const PointsRecord &b) {
++template<class C>
++inline PointsRecord mix_delta(const C &c, const PointsRecord &b) {
+   PointsRecord out{0, 0, {{0, 0, 0, 0, 0}}};
+-  auto p = weights(c);
++  const auto projection=sparsemax_projection::project(c,1.0);
+   for (std::size_t i = 0; i < c.size(); ++i) {
+-    double w = p[i] * c[i].coeff * c[i].event_weight;
++    double w = projection.weight(c[i].record.points_exp) * c[i].coeff * c[i].event_weight;
+     out.win_prob += w * (c[i].record.win_prob - b.win_prob);
+     out.points_exp += w * (c[i].record.points_exp - b.points_exp);
+     for (int h = 0; h < 5; ++h) out.han[h] += w * (c[i].record.han[h] - b.han[h]);
+   }
+   return out;
+ }
+-typedef std::array<std::vector<Candidate>, 38> TileCandidates;
++typedef std::array<Candidates, 38> TileCandidates;
+ inline TileCandidates baseline_per_tile(const PointsRecord &baseline) {
+   TileCandidates out;
+   for (int tile = 1; tile < 38; ++tile)
+--- a/src/ai_src/sparsemax_bellman.hpp
++++ b/src/ai_src/sparsemax_bellman.hpp
+@@ -1,7 +1,9 @@
+ #pragma once
++#include "sparsemax_projection.hpp"
+ #include <algorithm>
+ #include <cstddef>
+ #include <vector>
++#include <boost/container/small_vector.hpp>
+ 
+ namespace sparsemax_bellman {
+ constexpr double kTauPoints = 0.00048828125;
+@@ -17,13 +19,14 @@
+       : record(r), coeff(c), event_weight(event) {}
+ };
+ 
+-inline std::vector<double> weights(const std::vector<Candidate> &c) {
+-  std::vector<double> p(c.size(), 0.0);
++template<class Candidates>
++inline boost::container::small_vector<double, 8> weights_inline(const Candidates &c) {
++  boost::container::small_vector<double, 8> p(c.size(), 0.0);
+   if (c.empty()) return p;
+   double max_score = c[0].record.points_exp;
+   for (std::size_t i = 1; i < c.size(); ++i)
+     max_score = std::max(max_score, c[i].record.points_exp);
+-  std::vector<std::size_t> order(c.size());
++  boost::container::small_vector<std::size_t, 8> order(c.size());
+   for (std::size_t i = 0; i < c.size(); ++i) {
+     order[i] = i;
+     for (std::size_t j = i; j && c[order[j]].record.points_exp > c[order[j - 1]].record.points_exp;
+@@ -41,25 +44,32 @@
+     p[i] = std::max(0.0, (c[i].record.points_exp - max_score) / kTauPoints - theta);
+   return p;
+ }
+-inline Record mix_all(const std::vector<Candidate> &c) {
++inline std::vector<double> weights(const std::vector<Candidate> &c) {
++  auto p=weights_inline(c); return std::vector<double>(p.begin(),p.end());
++}
++typedef boost::container::small_vector<Candidate, 4> Candidates;
++
++template<class C>
++inline Record mix_all(const C &c) {
+   Record out{0, 0, 0, 0};
+-  const std::vector<double> p = weights(c);
++  const auto projection=sparsemax_projection::project(c,kTauPoints);
+   for (std::size_t i = 0; i < c.size(); ++i) {
+-    out.win_prob += p[i] * c[i].record.win_prob;
+-    out.win_exp += p[i] * c[i].record.win_exp;
+-    out.tenpai_prob += p[i] * c[i].record.tenpai_prob;
+-    out.points_exp += p[i] * c[i].record.points_exp;
++    out.win_prob += projection.weight(c[i].record.points_exp) * c[i].record.win_prob;
++    out.win_exp += projection.weight(c[i].record.points_exp) * c[i].record.win_exp;
++    out.tenpai_prob += projection.weight(c[i].record.points_exp) * c[i].record.tenpai_prob;
++    out.points_exp += projection.weight(c[i].record.points_exp) * c[i].record.points_exp;
+   }
+   return out;
+ }
+ // Apply an action-dependent coefficient after the simplex decision.  This is
+ // deliberately not an average of discrete flags: p_i is the probability of
+ // choosing record i, and coeff_i is applied to that record's Bellman delta.
+-inline Record mix_delta(const std::vector<Candidate> &c, const Record &baseline) {
++template<class C>
++inline Record mix_delta(const C &c, const Record &baseline) {
+   Record out{0, 0, 0, 0};
+-  const std::vector<double> p = weights(c);
++  const auto projection=sparsemax_projection::project(c,kTauPoints);
+   for (std::size_t i = 0; i < c.size(); ++i) {
+-    const double w = p[i] * c[i].coeff * c[i].event_weight;
++    const double w = projection.weight(c[i].record.points_exp) * c[i].coeff * c[i].event_weight;
+     out.win_prob += w * (c[i].record.win_prob - baseline.win_prob);
+     out.win_exp += w * (c[i].record.win_exp - baseline.win_exp);
+     out.tenpai_prob += w * (c[i].record.tenpai_prob - baseline.tenpai_prob);
+--- a/src/ai_src/sparsemax_projection.hpp
++++ b/src/ai_src/sparsemax_projection.hpp
+@@ -0,0 +1,33 @@
++#pragma once
++#include <algorithm>
++#include <boost/container/small_vector.hpp>
++
++namespace sparsemax_projection {
++struct Projection {
++  double maximum, theta, tau;
++  double weight(double score) const {
++    return std::max(0.0,(score-maximum)/tau-theta);
++  }
++};
++template<class C> inline Projection project(const C &c,double tau) {
++  if(c.empty()) return {0,0,tau};
++  double maximum=c[0].record.points_exp;
++  for(std::size_t i=1;i<c.size();++i) maximum=std::max(maximum,c[i].record.points_exp);
++  boost::container::small_vector<double,8> active;
++  // The simplex threshold is >= -1 after subtracting the maximum.
++  // Scores at or below -1 therefore have exactly zero projected weight.
++  for(const auto &v:c) {
++    double z=(v.record.points_exp-maximum)/tau;
++    if(z<=-1.0)continue;
++    active.push_back(z);
++    for(std::size_t j=active.size()-1;j&&active[j]>active[j-1];--j)std::swap(active[j],active[j-1]);
++  }
++  double prefix=0,theta=0;
++  for(std::size_t k=0;k<active.size();++k) {
++    prefix+=active[k];double t=(prefix-1.0)/double(k+1);
++    if(active[k]>t)theta=t;
++    else break;
++  }
++  return {maximum,theta,tau};
++}
++}
+--- a/src/ai_src/tenpai_estimator.cpp
++++ b/src/ai_src/tenpai_estimator.cpp
+@@ -388,7 +388,7 @@
+ 
+ Win_Estimate_Info yaku_check(const int round_wind, const int self_wind,
+                              const std::vector<int> &dora_vector, const Open_Meld_Vector open_meld,
+-                             const int visible_dora_num, const Tile_Array hand, const int head[38],
++                             const int visible_dora_num, const Tile_Array &hand, const int head[38],
+                              const int triplet[38], const int sequence[30], const int wait_tile,
+                              const Wait_Type wait_type, const int open_wait_id) {
+   Win_Estimate_Info win;
+@@ -571,10 +571,11 @@
+ Hand_Estimator_Element::Hand_Estimator_Element(Tile_Array hand_in) { reset(hand_in); }
+ 
+ void Hand_Estimator_Element::reset(Tile_Array hand_in) {
+-  hand = hand_in;
++  for(size_t k=0;k<hand.size();++k)hand[k]=static_cast<unsigned char>(hand_in[k]);
+   prob = 0.0;
+   prob_now = 0.0;
+   weight_units = 0;
++  multiplicity = 1;
+   admitted_now = false;
+   win_vector.clear();
+ }
+@@ -773,7 +774,11 @@
+   }
+ }
+ 
+-void Hand_Estimator::add_triplet(const int round_wind, const int self_wind,
++static void repeat_estimator_tail(std::vector<Hand_Estimator_Element> &out,size_t start) {
++ for(size_t k=start;k<out.size();++k)out[k].multiplicity*=2;
++}
++
++size_t Hand_Estimator::add_triplet(const int round_wind, const int self_wind,
+                                  const std::vector<int> &dora_vector,
+                                  const Open_Meld_Vector &open_meld, int head_num, int triplet_num,
+                                  int start, Tile_Array &hand, int head[38], int triplet[38],
+@@ -784,20 +789,21 @@
+       if (remaining[tile] - hand[tile] >= 3) {
+         hand[tile] += 3;
+         triplet[tile]++;
+-        add_triplet(round_wind, self_wind, dora_vector, open_meld, head_num, triplet_num + 1,
++        size_t tail=add_triplet(round_wind, self_wind, dora_vector, open_meld, head_num, triplet_num + 1,
+                     tile + 1, hand, head, triplet, sequence, hand_expected_value);
+-        add_sequence(round_wind, self_wind, dora_vector, open_meld, head_num, triplet_num + 1, 0, 1,
+-                     hand, head, triplet, sequence, hand_expected_value);
++        repeat_estimator_tail(hand_expected_value,tail);
+         hand[tile] -= 3;
+         triplet[tile]--;
+       }
+     }
+   }
++  size_t tail=hand_expected_value.size();
+   add_sequence(round_wind, self_wind, dora_vector, open_meld, head_num, triplet_num, 0, 1, hand,
+                head, triplet, sequence, hand_expected_value);
+-}
+-
+-void Hand_Estimator::add_head(const int round_wind, const int self_wind,
++  return tail;
++}
++
++size_t Hand_Estimator::add_head(const int round_wind, const int self_wind,
+                               const std::vector<int> &dora_vector,
+                               const Open_Meld_Vector &open_meld, int head_num, int start,
+                               Tile_Array &hand, int head[38], int triplet[38], int sequence[30],
+@@ -807,17 +813,18 @@
+       if (remaining[tile] - hand[tile] >= 2) {
+         hand[tile] += 2;
+         head[tile]++;
+-        add_head(round_wind, self_wind, dora_vector, open_meld, head_num + 1, tile + 1, hand, head,
++        size_t tail=add_head(round_wind, self_wind, dora_vector, open_meld, head_num + 1, tile + 1, hand, head,
+                  triplet, sequence, hand_expected_value);
+-        add_triplet(round_wind, self_wind, dora_vector, open_meld, head_num + 1, 0, 1, hand, head,
+-                    triplet, sequence, hand_expected_value);
++        repeat_estimator_tail(hand_expected_value,tail);
+         hand[tile] -= 2;
+         head[tile]--;
+       }
+     }
+   }
++  size_t tail=hand_expected_value.size();
+   add_triplet(round_wind, self_wind, dora_vector, open_meld, head_num, 0, 1, hand, head, triplet,
+               sequence, hand_expected_value);
++  return tail;
+ }
+ 
+ std::vector<Hand_Estimator_Element> Hand_Estimator::cal_hand_expected_value(
+@@ -835,8 +842,22 @@
+   visible_dora_num = count_dora(hand, open_meld, dora_marker);
+   std::vector<Hand_Estimator_Element> hand_expected_value;
+   const std::vector<int> dora_vector = dora_marker_to_dora(dora_marker);
+-  add_head(round_wind, self_wind, dora_vector, open_meld, 0, 1, hand, head, triplet, sequence,
+-           hand_expected_value);
++  std::array<std::vector<Hand_Estimator_Element>,39> branches;
++#pragma omp parallel for schedule(dynamic,1) num_threads(std::min(32,omp_get_max_threads()))
++  for(int tile=1;tile<=38;++tile) {
++    Tile_Array local_hand={};int local_head[38]={},local_triplet[38]={},local_sequence[30]={};
++    auto &out=branches[tile];
++    if(tile==38) {
++      add_triplet(round_wind,self_wind,dora_vector,open_meld,0,0,1,local_hand,local_head,local_triplet,local_sequence,out);
++    } else if(hand_max_num>0&&remaining[tile]>=2) {
++      local_hand[tile]=2;local_head[tile]=1;
++      size_t tail=add_head(round_wind,self_wind,dora_vector,open_meld,1,tile+1,local_hand,local_head,local_triplet,local_sequence,out);
++      repeat_estimator_tail(out,tail);
++    }
++  }
++  size_t total=0;for(auto &part:branches)total+=part.size();
++  hand_expected_value.reserve(total);
++  for(auto &part:branches)hand_expected_value.insert(hand_expected_value.end(),std::make_move_iterator(part.begin()),std::make_move_iterator(part.end()));
+   return hand_expected_value;
+ }
+ 
+@@ -848,6 +869,7 @@
+       game_state.round_wind, game_state.player_state[target].self_wind, game_state.dora_marker,
+       game_state.player_state[target].open_meld, hand_max_num_in, remaining_in, decline_win_in);
+   const std::array<bool, 38> decline_win_flags = get_decline_win(game_record, target);
++#pragma omp parallel for num_threads(std::min(32,omp_get_max_threads())) if(hand_expected_value.size()>2048)
+   for (int i = 0; i < hand_expected_value.size(); i++) {
+     unsigned long long weight_units = 1;
+     for (int tile = 0; tile < 38; tile++) {
+@@ -857,7 +879,7 @@
+     }
+     // Use fifths as the common exact mass unit. A single-wait candidate contributes one unit and
+     // a two-wait candidate contributes five; the common factor cancels during normalization.
+-    weight_units *= hand_expected_value[i].win_vector.size() < 2 ? 1ULL : 5ULL;
++    weight_units *= (hand_expected_value[i].win_vector.size() < 2 ? 1ULL : 5ULL) * hand_expected_value[i].multiplicity;
+     hand_expected_value[i].weight_units = weight_units;
+     hand_expected_value[i].prob = static_cast<float>(weight_units);
+ 
+@@ -898,8 +920,10 @@
+   unsigned long long den_normal_now = 0;
+   unsigned long long den_flushing[3] = {};
+   unsigned long long den_flushing_now[3] = {};
++  std::vector<Color_Type> colors(hand_expected_value.size());
++#pragma omp parallel for num_threads(std::min(32,omp_get_max_threads())) if(hand_expected_value.size()>2048) reduction(+:den_normal,den_normal_now,den_flushing[:3],den_flushing_now[:3])
+   for (int i = 0; i < hand_expected_value.size(); i++) {
+-    const Color_Type flushing_color = hand_expected_value[i].get_flushing_color(open_meld);
++    const Color_Type flushing_color = colors[i]=hand_expected_value[i].get_flushing_color(open_meld);
+     if (flushing_color == CT_NUM) {
+       den_normal += hand_expected_value[i].weight_units;
+       if (hand_expected_value[i].admitted_now)
+@@ -911,8 +935,9 @@
+     }
+   }
+ 
++#pragma omp parallel for num_threads(std::min(32,omp_get_max_threads())) if(hand_expected_value.size()>2048)
+   for (int i = 0; i < hand_expected_value.size(); i++) {
+-    const Color_Type flushing_color = hand_expected_value[i].get_flushing_color(open_meld);
++    const Color_Type flushing_color = colors[i];
+     if (flushing_color == CT_NUM) {
+       if (den_normal > 0) {
+         hand_expected_value[i].prob = static_cast<float>(hand_expected_value[i].weight_units) /
+@@ -987,6 +1012,19 @@
+     }
+   }
+   return tile_prob;
++}
++
++using TileProb = std::array<std::array<std::array<float,12>,14>,38>;
++static void all_tile_prob(const std::vector<Hand_Estimator_Element> &hands,TileProb &tsumo,TileProb &ron,TileProb &now) {
++ tsumo={};ron={};now={};
++ for(const auto &h:hands)for(const auto &w:h.win_vector)if(w.han>0){
++  int ft=(w.fu+11)/10,fr=(w.fu+9)/10;if(fr==2)fr=3;
++  tsumo[w.tile][w.han][ft]+=h.prob;ron[w.tile][w.han][fr]+=h.prob;now[w.tile][w.han][fr]+=h.prob_now;
++ }
++ for(int c=0;c<3;++c)for(int h=0;h<14;++h)for(int f=0;f<12;++f){
++  ron[10*c+10][std::min(h+1,13)][f]+=ron[10*c+5][h][f];
++  now[10*c+10][std::min(h+1,13)][f]+=now[10*c+5][h][f];
++ }
+ }
+ 
+ Wait_Coeff::Wait_Coeff() {}
+@@ -1711,9 +1749,7 @@
+             game_record, game_state, target,
+             std::min(7, 13 - (int)game_state.player_state[target].open_meld.size() * 3),
+             remaining_kind, discard_kind);
+-    tile_tsumo_prob = cal_tile_prob_from_hand_expected_value(hand_expected_value, true, false);
+-    tile_ron_prob = cal_tile_prob_from_hand_expected_value(hand_expected_value, false, false);
+-    tile_ron_prob_now = cal_tile_prob_from_hand_expected_value(hand_expected_value, false, true);
++    all_tile_prob(hand_expected_value,tile_tsumo_prob,tile_ron_prob,tile_ron_prob_now);
+   }
+ }
+ 
+--- a/src/ai_src/tenpai_estimator.hpp
++++ b/src/ai_src/tenpai_estimator.hpp
+@@ -1,4 +1,6 @@
+ #pragma once
++#include <boost/container/small_vector.hpp>
++#include <boost/container/static_vector.hpp>
+ 
+ #include "../share/include.hpp"
+ #include "../share/riichi_rules.hpp"
+@@ -52,7 +54,7 @@
+ 
+ Win_Estimate_Info yaku_check(const int round_wind, const int self_wind,
+                              const std::vector<int> &dora_vector, const int visible_dora_num,
+-                             const Tile_Array hand, const int head[38], const int triplet[38],
++                             const Tile_Array &hand, const int head[38], const int triplet[38],
+                              const int sequence[30], const int wait_tile, const Wait_Type wait_type,
+                              const int open_wait_id);
+ 
+@@ -60,9 +62,10 @@
+  public:
+   float prob, prob_now;
+   unsigned long long weight_units;
++  unsigned int multiplicity;
+   bool admitted_now;
+-  Tile_Array hand;
+-  std::vector<Win_Estimate_Info> win_vector;
++  std::array<unsigned char,38> hand;
++  boost::container::static_vector<Win_Estimate_Info,2> win_vector;
+ 
+   Hand_Estimator_Element();
+   Hand_Estimator_Element(Tile_Array hand_in);
+@@ -89,11 +92,11 @@
+                     const Open_Meld_Vector &open_meld, int head_num, int triplet_num,
+                     int sequence_num, int start, Tile_Array &hand, int head[38], int triplet[38],
+                     int sequence[30], std::vector<Hand_Estimator_Element> &hand_expected_value);
+-  void add_triplet(const int round_wind, const int self_wind, const std::vector<int> &dora_vector,
++  size_t add_triplet(const int round_wind, const int self_wind, const std::vector<int> &dora_vector,
+                    const Open_Meld_Vector &open_meld, int head_num, int triplet_num, int start,
+                    Tile_Array &hand, int head[38], int triplet[38], int sequence[30],
+                    std::vector<Hand_Estimator_Element> &hand_expected_value);
+-  void add_head(const int round_wind, const int self_wind, const std::vector<int> &dora_vector,
++  size_t add_head(const int round_wind, const int self_wind, const std::vector<int> &dora_vector,
+                 const Open_Meld_Vector &open_meld, int head_num, int start, Tile_Array &hand,
+                 int head[38], int triplet[38], int sequence[30],
+                 std::vector<Hand_Estimator_Element> &hand_expected_value);
+--- a/src/tests/projection_equivalence_test.cpp
++++ b/src/tests/projection_equivalence_test.cpp
+@@ -0,0 +1,25 @@
++#include "../ai_src/sparsemax_bellman.hpp"
++#include "../ai_src/simple_dp_sparsemax.hpp"
++#include <random>
++#include <cmath>
++#include <iostream>
++int main(){
++  std::mt19937_64 rng(8142);
++  for(int trial=0;trial<50000;++trial){
++    int n=1+rng()%80;
++    std::vector<sparsemax_bellman::Candidate> a;
++    std::vector<simple_dp_sparsemax::Candidate> b;
++    double base=int(rng()%20001)-10000;
++    for(int k=0;k<n;++k){
++      double z=(int(rng()%4097)-2048)/1024.0;
++      if(trial%3==0)z=std::round(z*2)/2;
++      double score=base+z*sparsemax_bellman::kTauPoints;
++      a.emplace_back(sparsemax_bellman::Record{.2,30,.4,score});
++      b.emplace_back(simple_dp_sparsemax::PointsRecord{.2,base+z,{{1,2,3,4,5}}});
++    }
++    auto p=sparsemax_bellman::weights(a);auto q=sparsemax_projection::project(a,sparsemax_bellman::kTauPoints);
++    auto r=simple_dp_sparsemax::weights(b);auto s=sparsemax_projection::project(b,1.0);
++    for(int k=0;k<n;++k)if(std::abs(p[k]-q.weight(a[k].record.points_exp))>1e-13||std::abs(r[k]-s.weight(b[k].record.points_exp))>1e-13)return 1;
++  }
++  std::cout<<"50000 projection differential cases passed\n";
++}
+--- a/src/tests/sparsemax_test.cpp
++++ b/src/tests/sparsemax_test.cpp
+@@ -110,7 +110,7 @@
+   independent[2].push_back(Candidate({1, 10 + gap, {{0, 0, 0, 0, 0}}}, 1, .3));
+   const PointsRecord tile2 = mix_delta(independent[2], a);
+   assert(tile2.points_exp > 0);
+-  std::vector<Candidate> wrong = independent[1];
++  std::vector<Candidate> wrong(independent[1].begin(), independent[1].end());
+   wrong.push_back(independent[2][1]);
+   assert(!near(mix_delta(wrong, a).points_exp,
+                mix_delta(independent[1], a).points_exp + tile2.points_exp, 1e-10));

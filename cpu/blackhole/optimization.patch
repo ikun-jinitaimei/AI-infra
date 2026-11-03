@@ -1,0 +1,788 @@
+--- a/env.sh
++++ b/env.sh
+@@ -1,5 +1,10 @@
+ module purge
+ module load openmpi/4.0.3-gcc-10.3.1
++export OMPI_MCA_coll='^hcoll'
++export OMPI_MCA_pml=ob1
++export OMPI_MCA_btl=self,vader,tcp
++export OMPI_MCA_ras='^slurm'
++export OMPI_MCA_plm=isolated
+ 
+ export CC=mpicc
+ export CXX=mpicxx
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -88,6 +88,9 @@
+ 
+ .PHONY: clean
+ 
++surface_integral.o: wave_plan.h wave_collective.h
++surface_integral.o: CXXFLAGS += -Ofast -DWAVE_REBUILD_XY=1 $(if $(filter aarch64,$(shell uname -m)),-mcpu=tsv110,)
++
+ # projects
+ blackhole: $(C++FILES) $(F90FILES) $(F77FILES) $(AHFDOBJS)
+ 	$(FC) $(LDFLAGS) -o $@ $(C++FILES) $(F90FILES) $(F77FILES) $(AHFDOBJS) $(LDLIBS)
+--- a/src/surface_integral.C
++++ b/src/surface_integral.C
+@@ -30,8 +30,13 @@
+ #include "getnpem2.h"
+ #include "getnp4.h"
+ #include "parameters.h"
++#include "wave_plan.h"
++#include "wave_collective.h"
+ 
+ #define PI M_PI
++#ifdef WAVE_PROFILE
++static double wave_times[4]={};
++#endif
+ //|============================================================================
+ //| Constructor
+ //|============================================================================
+@@ -182,6 +187,10 @@
+ //|============================================================================
+ surface_integral::~surface_integral()
+ {
++#ifdef WAVE_PROFILE
++  double times[4];MPI_Reduce(wave_times,times,4,MPI_DOUBLE,MPI_MAX,0,MPI_COMM_WORLD);
++  if(myrank==0)std::cerr<<"WAVE_PROFILE fill="<<times[0]<<" barrier="<<times[1]<<" compute="<<times[2]<<" reduce="<<times[3]<<std::endl;
++#endif
+   delete[] nx_g;
+   delete[] ny_g;
+   delete[] nz_g;
+@@ -193,6 +202,38 @@
+ void surface_integral::begin_wave_benchmark(int lev, cgh *GH, var *Rpsi4, var *Ipsi4,
+                                             int field_generation)
+ {
++  std::vector<WavePlan*> active;
++  int count=0;
++  for(auto &entry:wave_plans) if(std::get<0>(entry.first)==this && entry.second.ready) {
++    WavePlan &p=entry.second;p.prepared=false;
++    if(p.window==MPI_WIN_NULL)return;
++    active.push_back(&p);count+=2*p.modes;
++  }
++  if(active.empty())return;
++  wave_collective.init(count);
++#ifdef WAVE_PROFILE
++  double stamp=MPI_Wtime();
++#endif
++  for(auto p:active){p->fill(Rpsi4,Ipsi4);MPI_Win_sync(p->window);}
++#ifdef WAVE_PROFILE
++  wave_times[0]+=MPI_Wtime()-stamp;stamp=MPI_Wtime();
++#endif
++  wave_collective.barrier();
++#ifdef WAVE_PROFILE
++  wave_times[1]+=MPI_Wtime()-stamp;stamp=MPI_Wtime();
++#endif
++  std::vector<double> local(count),global(count);
++  int off=0;
++  for(auto p:active){MPI_Win_sync(p->window);p->gather();p->integrate(local.data()+off);off+=2*p->modes;}
++#ifdef WAVE_PROFILE
++  wave_times[2]+=MPI_Wtime()-stamp;stamp=MPI_Wtime();
++#endif
++  wave_collective.sum(local.data(),global.data(),count);
++#ifdef WAVE_PROFILE
++  wave_times[3]+=MPI_Wtime()-stamp;
++#endif
++  off=0;
++  for(auto p:active){p->result.assign(global.begin()+off,global.begin()+off+2*p->modes);p->prepared=true;off+=2*p->modes;}
+ }
+ void surface_integral::end_wave_benchmark()
+ {
+@@ -205,183 +246,77 @@
+                                  int spinw, int maxl, int NN, double *RP, double *IP,
+                                  monitor *Monitor) // NN is the length of RP and IP
+ {
+-  if (myrank == 0 && GH->grids[lev] != 1)
+-    if (Monitor->outfile)
+-      Monitor->outfile << "WARNING: surface integral on multipatches" << endl;
+-    else
+-      cout << "WARNING: surface integral on multipatches" << endl;
+-
+-  const int InList = 2;
+-
+-  MyList<var> *DG_List = new MyList<var>(Rpsi4);
+-  DG_List->insert(Ipsi4);
+-
+-  int n;
+-  double *pox[3];
+-  for (int i = 0; i < 3; i++)
+-    pox[i] = new double[n_tot];
+-  for (n = 0; n < n_tot; n++)
+-  {
+-    pox[0][n] = rex * nx_g[n];
+-    pox[1][n] = rex * ny_g[n];
+-    pox[2][n] = rex * nz_g[n];
+-  }
+-
+-  double *shellf;
+-  shellf = new double[n_tot * InList];
+-
+-  GH->PatL[lev]->data->Interp_Points(DG_List, n_tot, pox, shellf, Symmetry);
+-
+-  int mp, Lp, Nmin, Nmax;
+-
+-  mp = n_tot / cpusize;
+-  Lp = n_tot - cpusize * mp;
+-
+-  if (Lp > myrank)
+-  {
+-    Nmin = myrank * mp + myrank;
+-    Nmax = Nmin + mp;
+-  }
+-  else
+-  {
+-    Nmin = myrank * mp + Lp;
+-    Nmax = Nmin + mp - 1;
+-  }
+-
+-  //|~~~~~> Integrate the dot product of Dphi with the surface normal.
+-
+-  double *RP_out, *IP_out;
+-  RP_out = new double[NN];
+-  IP_out = new double[NN];
+-
+-  for (int ii = 0; ii < NN; ii++)
+-  {
+-    RP_out[ii] = 0;
+-    IP_out[ii] = 0;
+-  }
+-  // theta part
+-  double costheta, thetap;
+-  double cosmphi, sinmphi;
+-
+-  int i, j;
+-  int lpsy = 0;
+-  if (Symmetry == 0)
+-    lpsy = 1;
+-  else if (Symmetry == 1)
+-    lpsy = 2;
+-  else if (Symmetry == 2)
+-    lpsy = 8;
+-
+-  double psi4RR, psi4II;
+-  for (n = Nmin; n <= Nmax; n++)
+-  {
+-    //       need round off always
+-    i = int(n / N_phi); // int(1.723) = 1, int(-1.732) = -1
+-    j = n - i * N_phi;
+-
+-    int countlm = 0;
+-    for (int pl = spinw; pl < maxl + 1; pl++)
+-      for (int pm = -pl; pm < pl + 1; pm++)
+-      {
+-        for (int lp = 0; lp < lpsy; lp++)
+-        {
+-          switch (lp)
+-          {
+-          case 0: //+++ (theta, phi)
+-            costheta = arcostheta[i];
+-            cosmphi = cos(pm * (j + 0.5) * dphi);
+-            sinmphi = sin(pm * (j + 0.5) * dphi);
+-            psi4RR = shellf[InList * n];
+-            psi4II = shellf[InList * n + 1];
+-            break;
+-          case 1: //++- (pi-theta, phi)
+-            costheta = -arcostheta[i];
+-            cosmphi = cos(pm * (j + 0.5) * dphi);
+-            sinmphi = sin(pm * (j + 0.5) * dphi);
+-            psi4RR = Rpsi4->SoA[2] * shellf[InList * n];
+-            psi4II = Ipsi4->SoA[2] * shellf[InList * n + 1];
+-            break;
+-          case 2: //+-+ (theta, 2*pi-phi)
+-            costheta = arcostheta[i];
+-            cosmphi = cos(pm * (j + 0.5) * dphi);
+-            sinmphi = -sin(pm * (j + 0.5) * dphi);
+-            psi4RR = Rpsi4->SoA[1] * shellf[InList * n];
+-            psi4II = Ipsi4->SoA[1] * shellf[InList * n + 1];
+-            break;
+-          case 3: //+-- (pi-theta, 2*pi-phi)
+-            costheta = -arcostheta[i];
+-            cosmphi = cos(pm * (j + 0.5) * dphi);
+-            sinmphi = -sin(pm * (j + 0.5) * dphi);
+-            psi4RR = Rpsi4->SoA[2] * Rpsi4->SoA[1] * shellf[InList * n];
+-            psi4II = Ipsi4->SoA[2] * Ipsi4->SoA[1] * shellf[InList * n + 1];
+-            break;
+-          case 4: //-++ (theta, pi-phi)
+-            costheta = arcostheta[i];
+-            cosmphi = cos(pm * (PI - (j + 0.5) * dphi));
+-            sinmphi = sin(pm * (PI - (j + 0.5) * dphi));
+-            psi4RR = Rpsi4->SoA[0] * shellf[InList * n];
+-            psi4II = Ipsi4->SoA[0] * shellf[InList * n + 1];
+-            break;
+-          case 5: //-+- (pi-theta, pi-phi)
+-            costheta = -arcostheta[i];
+-            cosmphi = cos(pm * (PI - (j + 0.5) * dphi));
+-            sinmphi = sin(pm * (PI - (j + 0.5) * dphi));
+-            psi4RR = Rpsi4->SoA[2] * Rpsi4->SoA[0] * shellf[InList * n];
+-            psi4II = Ipsi4->SoA[2] * Ipsi4->SoA[0] * shellf[InList * n + 1];
+-            break;
+-          case 6: //--+ (theta, pi+phi)
+-            costheta = arcostheta[i];
+-            cosmphi = cos(pm * (PI + (j + 0.5) * dphi));
+-            sinmphi = sin(pm * (PI + (j + 0.5) * dphi));
+-            psi4RR = Rpsi4->SoA[1] * Rpsi4->SoA[0] * shellf[InList * n];
+-            psi4II = Ipsi4->SoA[1] * Ipsi4->SoA[0] * shellf[InList * n + 1];
+-            break;
+-          case 7: //--- (pi-theta, pi+phi)
+-            costheta = -arcostheta[i];
+-            cosmphi = cos(pm * (PI + (j + 0.5) * dphi));
+-            sinmphi = sin(pm * (PI + (j + 0.5) * dphi));
+-            psi4RR = Rpsi4->SoA[2] * Rpsi4->SoA[1] * Rpsi4->SoA[0] * shellf[InList * n];
+-            psi4II = Ipsi4->SoA[2] * Ipsi4->SoA[1] * Ipsi4->SoA[0] * shellf[InList * n + 1];
+-          }
+-
+-          thetap = sqrt((2 * pl + 1.0) / 4.0 / PI) * misc::Wigner_d_function(pl, pm, spinw, costheta); // note the variation from -2 to 2
+-#ifdef GaussInt
+-          // wtcostheta is even function respect costheta
+-          RP_out[countlm] = RP_out[countlm] + thetap * (psi4RR * cosmphi + psi4II * sinmphi) * wtcostheta[i];
+-          IP_out[countlm] = IP_out[countlm] + thetap * (psi4II * cosmphi - psi4RR * sinmphi) * wtcostheta[i];
+-#else
+-          RP_out[countlm] = RP_out[countlm] + thetap * (psi4RR * cosmphi + psi4II * sinmphi);
+-          IP_out[countlm] = IP_out[countlm] + thetap * (psi4II * cosmphi - psi4RR * sinmphi);
+-#endif
++  WaveKey key(this, GH->PatL[lev]->data, rex, spinw, maxl, Rpsi4->sgfn, Ipsi4->sgfn);
++  WavePlan &p = wave_plans[key];
++  if (!p.ready) {
++    p.build(GH->PatL[lev]->data, rex, n_tot, nx_g, ny_g, nz_g,
++            Symmetry, myrank, cpusize, Rpsi4, Ipsi4, N_phi);
++    if(Symmetry<=1) {
++      p.fourier=true;p.nphi=N_phi;p.maxl=maxl;p.spin=spinw;
++      p.trig.resize(N_phi*(maxl+1)*2);
++      for(int j=0;j<N_phi;++j)for(int m=0;m<=maxl;++m){
++        p.trig[(j*(maxl+1)+m)*2]=cos(m*(j+0.5)*dphi);
++        p.trig[(j*(maxl+1)+m)*2+1]=sin(m*(j+0.5)*dphi);
++      }
++      int firsttheta=0,lasttheta=N_theta-1;
++      p.harm.resize((lasttheta-firsttheta+1)*NN*2);
++      for(int i=firsttheta;i<=lasttheta;++i) {
++        int mode=0;
++        for(int l=spinw;l<=maxl;++l)for(int m=-l;m<=l;++m,++mode) {
++          double t=sqrt((2*l+1.0)/4.0/PI)*misc::Wigner_d_function(l,m,spinw,arcostheta[i]);
++          double reflected=Symmetry==1?sqrt((2*l+1.0)/4.0/PI)*misc::Wigner_d_function(l,m,spinw,-arcostheta[i]):0;
++          double w=1;
++#ifdef GaussInt
++          w=wtcostheta[i];
++#endif
++          p.harm[((i-firsttheta)*NN+mode)*2]=(t+reflected*Rpsi4->SoA[2])*w;
++          p.harm[((i-firsttheta)*NN+mode)*2+1]=(t+reflected*Ipsi4->SoA[2])*w;
+         }
+-        countlm++; // no sanity check for countlm and NN which should be noted in the input parameters
+       }
+-  }
+-
+-  for (int ii = 0; ii < NN; ii++)
+-  {
+-#ifdef GaussInt
+-    RP_out[ii] = RP_out[ii] * rex * dphi;
+-    IP_out[ii] = IP_out[ii] * rex * dphi;
+-#else
+-    RP_out[ii] = RP_out[ii] * rex * dphi * dcostheta;
+-    IP_out[ii] = IP_out[ii] * rex * dphi * dcostheta;
+-#endif
+-  }
+-  //|------+  Communicate and sum the results from each processor.
+-
+-  MPI_Allreduce(RP_out, RP, NN, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+-  MPI_Allreduce(IP_out, IP, NN, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+-
+-  //|------= Free memory.
+-
+-  delete[] pox[0];
+-  delete[] pox[1];
+-  delete[] pox[2];
+-  delete[] shellf;
+-  delete[] RP_out;
+-  delete[] IP_out;
+-  DG_List->clearList();
++    } else {
++    p.coeff.resize(p.points.size()*NN*4);
++    int lpsy = Symmetry==0 ? 1 : (Symmetry==1 ? 2 : 8);
++    for (size_t q=0;q<p.points.size();++q) {
++      int n=p.global_points[q], i=n/N_phi, j=n%N_phi, mode=0;
++      for (int l=spinw;l<=maxl;++l) for (int m=-l;m<=l;++m,++mode) {
++        double *c=&p.coeff[(q*NN+mode)*4];
++        for (int lp=0;lp<lpsy;++lp) {
++          double ct=(lp&1) ? -arcostheta[i] : arcostheta[i];
++          double phase=(j+0.5)*dphi;
++          if (lp>=6) phase=PI+phase;
++          else if (lp>=4) phase=PI-phase;
++          double co=cos(m*phase), si=sin(m*phase);
++          if (lp==2 || lp==3) si=-si;
++          double sr=1,ss=1;
++          if (lp&1) {sr*=Rpsi4->SoA[2];ss*=Ipsi4->SoA[2];}
++          if (lp==2||lp==3||lp>=6) {sr*=Rpsi4->SoA[1];ss*=Ipsi4->SoA[1];}
++          if (lp>=4) {sr*=Rpsi4->SoA[0];ss*=Ipsi4->SoA[0];}
++          double t=sqrt((2*l+1.0)/4.0/PI)*misc::Wigner_d_function(l,m,spinw,ct);
++#ifdef GaussInt
++          t*=wtcostheta[i];
++#endif
++          c[0]+=t*sr*co; c[1]+=t*ss*si;
++          c[2]+=-t*sr*si; c[3]+=t*ss*co;
++        }
++      }
++    }
++  }
++  }
++  p.modes=NN;p.scale=rex*dphi;
++#ifndef GaussInt
++  p.scale*=dcostheta;
++#endif
++  if(p.prepared) {
++    std::copy(p.result.begin(),p.result.begin()+NN,RP);
++    std::copy(p.result.begin()+NN,p.result.end(),IP);
++    return;
++  }
++  p.exchange(Rpsi4,Ipsi4);
++  std::vector<double> sums(2*NN),result(2*NN);
++  p.integrate(sums.data());
++  MPI_Allreduce(sums.data(),result.data(),2*NN,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
++  std::copy(result.begin(),result.begin()+NN,RP);
++  std::copy(result.begin()+NN,result.end(),IP);
+ }
+ void surface_integral::surf_Wave(double rex, int lev, cgh *GH, var *Rpsi4, var *Ipsi4,
+                                  int spinw, int maxl, int NN, double *RP, double *IP,
+--- a/src/wave_collective.h
++++ b/src/wave_collective.h
+@@ -0,0 +1,47 @@
++#ifndef WAVE_COLLECTIVE_H
++#define WAVE_COLLECTIVE_H
++#include <cstring>
++#include <vector>
++#include <cstdint>
++struct WaveCollective {
++ MPI_Win win=MPI_WIN_NULL;
++ int rank=0,size=0,capacity=0;
++ unsigned long long epoch=0,round=0;
++ std::vector<char*> slot;
++ static unsigned long long load(char *p,int k) { return __atomic_load_n(reinterpret_cast<unsigned long long*>(p)+k,__ATOMIC_ACQUIRE); }
++ static void store(char *p,int k,unsigned long long v) { __atomic_store_n(reinterpret_cast<unsigned long long*>(p)+k,v,__ATOMIC_RELEASE); }
++ static void wait(char *p,int k,unsigned long long v) { while(load(p,k)<v) {
++#ifdef __aarch64__
++ asm volatile("yield" ::: "memory");
++#endif
++ } }
++ void init(int n) {
++  if(win!=MPI_WIN_NULL)return;
++  capacity=n;MPI_Comm local;MPI_Comm_split_type(MPI_COMM_WORLD,MPI_COMM_TYPE_SHARED,0,MPI_INFO_NULL,&local);
++  MPI_Comm_rank(local,&rank);MPI_Comm_size(local,&size);
++  MPI_Info info;MPI_Info_create(&info);MPI_Info_set(info,"alloc_shared_noncontig","true");
++  char *base;MPI_Win_allocate_shared(256+n*sizeof(double),1,info,local,&base,&win);MPI_Info_free(&info);
++  std::memset(base,0,256+n*sizeof(double));slot.resize(size);
++  for(int r=0;r<size;++r){MPI_Aint bytes;int unit;MPI_Win_shared_query(win,r,&bytes,&unit,&slot[r]);}
++  MPI_Win_lock_all(0,win);MPI_Win_sync(win);MPI_Barrier(local);MPI_Win_sync(win);MPI_Comm_free(&local);
++ }
++ void barrier() {
++  ++epoch;
++  for(int c=2*rank+1;c<=2*rank+2&&c<size;++c)wait(slot[c],0,epoch);
++  store(slot[rank],0,epoch);
++  if(rank==0)store(slot[0],8,epoch);else wait(slot[0],8,epoch);
++ }
++ void sum(const double *input,double *output,int n) {
++  ++round;double *mine=reinterpret_cast<double*>(slot[rank]+256);
++  std::memcpy(mine,input,n*sizeof(double));
++  for(int c=2*rank+1;c<=2*rank+2&&c<size;++c){
++   wait(slot[c],16,round);const double *child=reinterpret_cast<double*>(slot[c]+256);
++   for(int j=0;j<n;++j)mine[j]+=child[j];
++  }
++  store(slot[rank],16,round);
++  if(rank==0)store(slot[0],24,round);else wait(slot[0],24,round);
++  std::memcpy(output,slot[0]+256,n*sizeof(double));
++ }
++};
++static WaveCollective wave_collective;
++#endif
+--- a/src/wave_plan.h
++++ b/src/wave_plan.h
+@@ -0,0 +1,391 @@
++#ifndef WAVE_PLAN_H
++#define WAVE_PLAN_H
++#ifndef WAVE_PHI_PARTS
++#define WAVE_PHI_PARTS 4
++#endif
++#ifndef WAVE_REBUILD_XY
++#define WAVE_REBUILD_XY 0
++#endif
++#include <vector>
++#include <map>
++#include <tuple>
++#include <algorithm>
++#include <cstdint>
++#ifdef __aarch64__
++#include <arm_neon.h>
++#endif
++
++// Geometry-only plans. Field values are gathered anew by exchange() on every call.
++struct WavePlan {
++  struct Point { std::vector<int> ix; std::vector<double> wr,wi,xr,xi,yr,yi; };
++  bool ready=false;
++  int first=0, order=0;
++  std::vector<Point> points, rows;
++  std::vector<double> rowr,rowi,rowpair,rowweights;
++  std::vector<int> rowindices,pointindices,global_points,rowweightids;
++  std::vector<unsigned short> shortrowindices;
++  std::vector<double> pointweights,pointcoords,scalarweights;
++  std::vector<unsigned short> shortindices;
++  bool compact_xy=false;
++  std::vector<Block*> blocks;
++  std::vector<int> sc,sd,rc,rd;
++  std::vector<unsigned long long> outgoing;
++  std::vector<double> send,recv,coeff;
++  MPI_Win window=MPI_WIN_NULL;
++  double *shared=nullptr;
++  std::vector<double*> inputs;
++  std::vector<double> result,pointvalues;
++  int modes=0, nphi=0, maxl=0, spin=0;
++  bool fourier=false;
++  std::vector<double> trig,harm;
++  double scale=1;
++  bool prepared=false;
++  void build(Patch *patch,double rex,int total,double *nx,double *ny,double *nz,
++             int sym,int rank,int size,var *rv,var *iv,int phi_count) {
++    compact_xy=sym<=1;
++    order=2*ghost_width;
++    auto oi=parameters::int_par.find("surface interpolation order");
++    if(oi!=parameters::int_par.end()) order=oi->second;
++    if(size<=total/phi_count/2) {
++      int count=total/size+(rank<total%size);
++      int start=rank*(total/size)+std::min(rank,total%size);
++      for(int q=0;q<count;++q)global_points.push_back(start+q);
++    } else {
++    int chunk=std::max(1,phi_count/WAVE_PHI_PARTS);
++    for(int base=0,part=0;base<total;base+=chunk,++part){
++      int owner=part%size;if((part/size)&1)owner=size-1-owner;
++      if(owner==rank)for(int q=base;q<std::min(total,base+chunk);++q)global_points.push_back(q);
++    }
++    }
++    int count=global_points.size();first=count?global_points.front():0;
++    points.resize(count);
++    for(auto b=patch->blb;b;b=b->next) {blocks.push_back(b->data);if(b==patch->ble)break;}
++    std::vector<std::map<unsigned long long,int> > requests(size);
++    std::vector<std::vector<std::pair<int,unsigned long long> > > keys;
++    std::map<std::tuple<int,int,int,int,double>,int> rowmap;
++    for(int q=0;q<count;++q) {
++      double xyz[3]={rex*nx[global_points[q]],rex*ny[global_points[q]],rex*nz[global_points[q]]};
++      int bid=-1;
++      for(size_t b=0;b<blocks.size();++b) {
++        bool ok=true;
++        for(int d=0;d<3;++d) {
++          double h=patch->getdX(d);
++#ifdef Vertex
++          double ghost=ghost_width-0.5;
++#else
++          double ghost=ghost_width;
++#endif
++          double lo=blocks[b]->bbox[d]+(fabs(blocks[b]->bbox[d]-patch->bbox[d])<h/2?patch->lli[d]:ghost)*h;
++          double hi=blocks[b]->bbox[d+3]-(fabs(blocks[b]->bbox[d+3]-patch->bbox[d+3])<h/2?patch->uui[d]:ghost)*h;
++          if(xyz[d]-lo < -h/2 || xyz[d]-hi > h/2) {ok=false;break;}
++        }
++        if(ok){bid=b;break;}
++      }
++      if(bid<0) MPI_Abort(MPI_COMM_WORLD,1);
++      Block *b=blocks[bid];
++      std::vector<int> idx[3]; std::vector<double> w[3],sr[3],si[3];
++      int zbegin=0;double zcoord=0;
++      for(int d=0;d<3;++d) {
++#ifdef Vertex
++        double h=(b->bbox[d+3]-b->bbox[d])/(b->shape[d]-1); double offset=0;
++#else
++        double h=(b->bbox[d+3]-b->bbox[d])/b->shape[d]; double offset=0.5;
++#endif
++        double x0=b->bbox[d]+offset*h;
++        double step=(b->bbox[d]+(1+offset)*h)-x0;
++        int begin=int((xyz[d]-x0)/step+0.4)+1-order/2+1;
++        int low=1;
++        if(((d<2&&sym==2)||(d==2&&sym!=0))&&fabs(x0)<step) {
++#ifdef Vertex
++          low=-order/2+2;
++#else
++          low=-order/2+1;
++#endif
++        }
++        begin=std::max(begin,low); begin=std::min(begin,b->shape[d]+1-order);
++#ifdef Vertex
++        int reflect=2;
++#else
++        int reflect=1;
++#endif
++        double base=begin>0 ? b->bbox[d]+(begin-1+offset)*h : -(b->bbox[d]+(reflect-begin-1+offset)*h);
++        double x=(xyz[d]-base)/step;
++        if(d==2){zbegin=begin;zcoord=x;}else pointcoords.push_back(x);
++        idx[d].resize(order);w[d].resize(order);sr[d].resize(order,1);si[d].resize(order,1);
++        for(int k=0;k<order;++k) {
++          double wk=1;
++          for(int j=0;j<order;++j) if(j!=k) wk*=(x-j)/double(k-j);
++          w[d][k]=wk;int v=begin+k;
++          if(v<=0) {v=reflect-v;sr[d][k]=rv->SoA[d];si[d][k]=iv->SoA[d];}
++          idx[d][k]=v-1;
++        }
++      }
++      Point &p=points[q];
++      for(int k=0;k<order;++k){p.xr.push_back(w[0][k]*sr[0][k]);p.xi.push_back(w[0][k]*si[0][k]);p.yr.push_back(w[1][k]*sr[1][k]);p.yi.push_back(w[1][k]*si[1][k]);}
++      for(int x=0;x<order;++x) for(int y=0;y<order;++y) {
++        auto key=std::make_tuple(bid,idx[0][x],idx[1][y],zbegin,zcoord);
++        auto it=rowmap.find(key);int row;
++        if(it==rowmap.end()) {
++          row=rows.size();rowmap[key]=row;rows.emplace_back();keys.emplace_back();
++          for(int z=0;z<order;++z) {
++            unsigned long long pos=idx[0][x]+b->shape[0]*(idx[1][y]+b->shape[1]*idx[2][z]);
++            unsigned long long fieldkey=(static_cast<unsigned long long>(bid)<<32)|pos;
++            requests[b->rank][fieldkey]=0;keys.back().push_back(std::make_pair(b->rank,fieldkey));
++            rows.back().wr.push_back(w[2][z]*sr[2][z]);rows.back().wi.push_back(w[2][z]*si[2][z]);
++          }
++        } else row=it->second;
++        p.ix.push_back(row);
++
++      }
++    }
++    if(rows.size()<65536)for(const auto &p:points)for(int k:p.ix)shortindices.push_back(k);
++    if(order==4||order==6) {
++      for(auto &p:points) {
++        scalarweights.insert(scalarweights.end(),p.xr.begin(),p.xr.end());scalarweights.insert(scalarweights.end(),p.yr.begin(),p.yr.end());
++        pointindices.insert(pointindices.end(),p.ix.begin(),p.ix.end());
++        for(int k=0;k<order;++k){pointweights.push_back(p.xr[k]);pointweights.push_back(p.xi[k]);}
++        for(int k=0;k<order;++k){pointweights.push_back(p.yr[k]);pointweights.push_back(p.yi[k]);}
++        Point empty;p=std::move(empty);
++      }
++    }
++    rc.resize(size);rd.resize(size);sc.resize(size);sd.resize(size);
++    std::vector<unsigned long long> incoming;
++    for(int r=0;r<size;++r) {
++      rd[r]=incoming.size();rc[r]=requests[r].size();
++      for(auto &e:requests[r]) {e.second=incoming.size();incoming.push_back(e.first);}
++    }
++    MPI_Alltoall(rc.data(),1,MPI_INT,sc.data(),1,MPI_INT,MPI_COMM_WORLD);
++    int nsend=0;for(int r=0;r<size;++r){sd[r]=nsend;nsend+=sc[r];}
++    outgoing.resize(nsend);
++    MPI_Alltoallv(incoming.data(),rc.data(),rd.data(),MPI_UNSIGNED_LONG_LONG,
++                  outgoing.data(),sc.data(),sd.data(),MPI_UNSIGNED_LONG_LONG,MPI_COMM_WORLD);
++    for(size_t q=0;q<rows.size();++q) for(auto k:keys[q]) rows[q].ix.push_back(requests[k.first][k.second]*2);
++    rowr.resize(rows.size());rowi.resize(rows.size());rowpair.resize(2*rows.size());
++    std::map<std::vector<double>,int> weightmap;
++    for(const auto &row:rows) {
++      std::vector<double> weights;for(int z=0;z<order;++z){rowindices.push_back(row.ix[z]);weights.push_back(row.wr[z]);weights.push_back(row.wi[z]);}
++      auto it=weightmap.find(weights);int wid;
++      if(it==weightmap.end()){wid=rowweights.size();weightmap[weights]=wid;rowweights.insert(rowweights.end(),weights.begin(),weights.end());}else wid=it->second;
++      rowweightids.push_back(wid);
++    }
++    if(2*incoming.size()<65536)for(int k:rowindices)shortrowindices.push_back(k);
++    std::vector<Point>().swap(rows);
++    send.resize(2*nsend);recv.resize(2*incoming.size());
++    // Single-node shared-memory transport; retain the MPI transport for multi-node runs.
++    MPI_Comm local;
++    MPI_Comm_split_type(MPI_COMM_WORLD,MPI_COMM_TYPE_SHARED,rank,MPI_INFO_NULL,&local);
++    int local_size;MPI_Comm_size(local,&local_size);
++    if(local_size==size) {
++      std::vector<int> positions(nsend);
++      std::map<unsigned long long,int> unique;
++      std::vector<unsigned long long> compact;
++      for(int j=0;j<nsend;++j){auto k=outgoing[j];auto it=unique.find(k);if(it==unique.end()){int n=compact.size();unique[k]=n;compact.push_back(k);positions[j]=n;}else positions[j]=it->second;}
++      outgoing.swap(compact);
++      MPI_Info info;MPI_Info_create(&info);MPI_Info_set(info,"alloc_shared_noncontig","true");
++      MPI_Win_allocate_shared(outgoing.size()*2*sizeof(double),sizeof(double),info,local,&shared,&window);MPI_Info_free(&info);
++      inputs.resize(recv.size()/2);
++      std::vector<int> mapped(incoming.size());
++      MPI_Alltoallv(positions.data(),sc.data(),sd.data(),MPI_INT,mapped.data(),rc.data(),rd.data(),MPI_INT,MPI_COMM_WORLD);
++      for(int r=0;r<size;++r) {
++        MPI_Aint bytes;int unit;double *base;
++        MPI_Win_shared_query(window,r,&bytes,&unit,&base);
++        for(int j=rd[r];j<rd[r]+rc[r];++j) inputs[j]=base+2*mapped[j];
++      }
++      MPI_Win_lock_all(0,window);
++    }
++    MPI_Comm_free(&local);
++    for(int r=0;r<size;++r){sc[r]*=2;sd[r]*=2;rc[r]*=2;rd[r]*=2;}
++    ready=true;
++  }
++  void exchange(var *r,var *i) {
++    fill(r,i);
++    if(window!=MPI_WIN_NULL) {MPI_Win_sync(window);MPI_Barrier(MPI_COMM_WORLD);MPI_Win_sync(window);gather();}
++    else MPI_Alltoallv(send.data(),sc.data(),sd.data(),MPI_DOUBLE,recv.data(),rc.data(),rd.data(),MPI_DOUBLE,MPI_COMM_WORLD);
++  }
++  void fill(var *r,var *i) {
++    double *dst=window!=MPI_WIN_NULL?shared:send.data();
++    for(size_t j=0;j<outgoing.size();++j) {
++      Block *b=blocks[outgoing[j]>>32];unsigned pos=outgoing[j];
++      dst[2*j]=b->fgfs[r->sgfn][pos];dst[2*j+1]=b->fgfs[i->sgfn][pos];
++    }
++  }
++  void gather() {
++    if(order==4||order==6)return;
++    for(size_t j=0;j<inputs.size();++j){recv[2*j]=inputs[j][0];recv[2*j+1]=inputs[j][1];}
++  }
++  void integrate(double *sums) {
++    collapse();
++    std::fill(sums,sums+2*modes,0.0);
++    if(fourier) {
++      pointvalues.resize(2*points.size());
++      for(size_t q=0;q<points.size();++q)interpolate(q,pointvalues[2*q],pointvalues[2*q+1]);
++      switch(maxl) {
++        case 0:fourier_fixed<0>(sums);break;
++        case 1:fourier_fixed<1>(sums);break;
++        case 2:fourier_fixed<2>(sums);break;
++        case 3:fourier_fixed<3>(sums);break;
++        case 4:fourier_fixed<4>(sums);break;
++        case 5:fourier_fixed<5>(sums);break;
++        case 6:fourier_fixed<6>(sums);break;
++        case 7:fourier_fixed<7>(sums);break;
++        case 8:fourier_fixed<8>(sums);break;
++        case 9:fourier_fixed<9>(sums);break;
++        case 10:fourier_fixed<10>(sums);break;
++        case 11:fourier_fixed<11>(sums);break;
++        case 12:fourier_fixed<12>(sums);break;
++        default:fourier_generic(sums);break;
++      }
++    } else {
++    for(size_t q=0;q<points.size();++q) {
++      double r,v;interpolate(q,r,v);const double *c=&coeff[q*modes*4];
++      for(int m=0;m<modes;++m,c+=4){sums[m]+=r*c[0]+v*c[1];sums[m+modes]+=r*c[2]+v*c[3];}
++    }
++    }
++    for(int m=0;m<2*modes;++m)sums[m]*=scale;
++  }
++  template<int L> void fourier_fixed(double *sums) {
++      double f[4*(L+1)];
++      size_t q=0;
++      while(q<points.size()) {
++        int theta=global_points[q]/nphi;
++        std::fill(f,f+4*(L+1),0.0);
++        while(q<points.size() && global_points[q]/nphi==theta) {
++          double r=pointvalues[2*q],v=pointvalues[2*q+1];
++          const double *tr=&trig[(global_points[q]%nphi)*(L+1)*2];
++          #pragma GCC unroll 16
++          for(int m=0;m<=L;++m) {f[4*m]+=r*tr[2*m];f[4*m+1]+=r*tr[2*m+1];f[4*m+2]+=v*tr[2*m];f[4*m+3]+=v*tr[2*m+1];}
++          ++q;
++        }
++        const double *h=&harm[theta*modes*2];
++        int mode=0;
++        for(int l=spin;l<=maxl;++l)for(int m=-l;m<=l;++m,++mode) {
++          int a=abs(m);double sign=m<0?-1.0:1.0;
++          sums[mode]+=h[2*mode]*f[4*a]+h[2*mode+1]*f[4*a+3]*sign;
++          sums[mode+modes]+=h[2*mode+1]*f[4*a+2]-h[2*mode]*f[4*a+1]*sign;
++        }
++      }
++  }
++  void fourier_generic(double *sums) {
++      std::vector<double> f(4*(maxl+1));
++      size_t q=0;
++      while(q<points.size()) {
++        int theta=global_points[q]/nphi;
++        std::fill(f.begin(),f.end(),0.0);
++        while(q<points.size() && global_points[q]/nphi==theta) {
++          double r=pointvalues[2*q],v=pointvalues[2*q+1];
++          const double *tr=&trig[(global_points[q]%nphi)*(maxl+1)*2];
++          for(int m=0;m<=maxl;++m) {f[4*m]+=r*tr[2*m];f[4*m+1]+=r*tr[2*m+1];f[4*m+2]+=v*tr[2*m];f[4*m+3]+=v*tr[2*m+1];}
++          ++q;
++        }
++        const double *h=&harm[theta*modes*2];
++        int mode=0;
++        for(int l=spin;l<=maxl;++l)for(int m=-l;m<=l;++m,++mode) {
++          int a=abs(m);double sign=m<0?-1.0:1.0;
++          sums[mode]+=h[2*mode]*f[4*a]+h[2*mode+1]*f[4*a+3]*sign;
++          sums[mode+modes]+=h[2*mode+1]*f[4*a+2]-h[2*mode]*f[4*a+1]*sign;
++        }
++      }
++  }
++  template<int N,class Index> void collapse_fixed(const Index *index) {
++    size_t q=0;
++    while(q<rowr.size()){
++      const int wid=rowweightids[q];size_t end=q+1;while(end<rowr.size()&&rowweightids[end]==wid)++end;
++      const double *w=&rowweights[wid];
++#ifdef __aarch64__
++      float64x2_t weights[N];for(int j=0;j<N;++j)weights[j]=vld1q_f64(w+2*j);
++      for(;q<end;++q){const Index *ix=index+q*N;float64x2_t a=vdupq_n_f64(0),b=a;
++        for(int j=0;j<N;j+=2){a=vfmaq_f64(a,vld1q_f64(&recv[ix[j]]),weights[j]);b=vfmaq_f64(b,vld1q_f64(&recv[ix[j+1]]),weights[j+1]);}
++        vst1q_f64(&rowpair[2*q],vaddq_f64(a,b));
++      }
++#else
++      for(;q<end;++q){const Index *ix=index+q*N;double r=0,i=0;for(int j=0;j<N;++j){r+=w[2*j]*recv[ix[j]];i+=w[2*j+1]*recv[ix[j]+1];}rowr[q]=r;rowi[q]=i;rowpair[2*q]=r;rowpair[2*q+1]=i;}
++#endif
++    }
++  }
++  template<int N,class Index> void collapse_direct(const Index *index) {
++    size_t q=0;
++    while(q<rowr.size()){
++      const int wid=rowweightids[q];size_t end=q+1;while(end<rowr.size()&&rowweightids[end]==wid)++end;
++      const double *w=&rowweights[wid];
++#ifdef __aarch64__
++      float64x2_t weights[N];for(int j=0;j<N;++j)weights[j]=vld1q_f64(w+2*j);
++      for(;q<end;++q){const Index *ix=index+q*N;float64x2_t a=vdupq_n_f64(0),b=a;
++        for(int j=0;j<N;j+=2){a=vfmaq_f64(a,vld1q_f64(inputs[ix[j]/2]),weights[j]);b=vfmaq_f64(b,vld1q_f64(inputs[ix[j+1]/2]),weights[j+1]);}
++        vst1q_f64(&rowpair[2*q],vaddq_f64(a,b));
++      }
++#else
++      for(;q<end;++q){const Index *ix=index+q*N;double r=0,i=0;for(int j=0;j<N;++j){r+=w[2*j]*inputs[ix[j]/2][0];i+=w[2*j+1]*inputs[ix[j]/2][1];}rowr[q]=r;rowi[q]=i;rowpair[2*q]=r;rowpair[2*q+1]=i;}
++#endif
++    }
++  }
++  void collapse() {
++    if(window!=MPI_WIN_NULL) {
++      if(order==4){if(shortrowindices.empty())collapse_direct<4>(rowindices.data());else collapse_direct<4>(shortrowindices.data());return;}
++      if(order==6){if(shortrowindices.empty())collapse_direct<6>(rowindices.data());else collapse_direct<6>(shortrowindices.data());return;}
++    }
++    if(order==4){if(shortrowindices.empty())collapse_fixed<4>(rowindices.data());else collapse_fixed<4>(shortrowindices.data());return;}
++    if(order==6){if(shortrowindices.empty())collapse_fixed<6>(rowindices.data());else collapse_fixed<6>(shortrowindices.data());return;}
++    for(size_t q=0;q<rowr.size();++q) {
++      const int *ix=&rowindices[q*order];const double *w=&rowweights[rowweightids[q]];
++#ifdef __aarch64__
++      float64x2_t sum=vdupq_n_f64(0);
++      for(int j=0;j<order;++j)sum=vfmaq_f64(sum,vld1q_f64(&recv[ix[j]]),vld1q_f64(w+2*j));
++      vst1q_f64(&rowpair[2*q],sum);if(order!=4&&order!=6){rowr[q]=vgetq_lane_f64(sum,0);rowi[q]=vgetq_lane_f64(sum,1);}
++#else
++      double r=0,i=0;for(int j=0;j<order;++j){r+=w[2*j]*recv[ix[j]];i+=w[2*j+1]*recv[ix[j]+1];}
++      rowr[q]=r;rowi[q]=i;rowpair[2*q]=r;rowpair[2*q+1]=i;
++#endif
++    }
++  }
++
++  template<int N> static void basis(double x,double *w) {
++    for(int k=0;k<N;++k) {double value=1;for(int j=0;j<N;++j)if(j!=k)value*=(x-j)/double(k-j);w[k]=value;}
++  }
++  template<int N,class Index> void interpolate_compact(size_t q,const Index *idx,double &r,double &i) const {
++#if WAVE_REBUILD_XY
++    double wx[N],wy[N];basis<N>(pointcoords[2*q],wx);basis<N>(pointcoords[2*q+1],wy);
++#else
++    const double *wx=&scalarweights[q*2*N],*wy=wx+N;
++#endif
++#ifdef __aarch64__
++    float64x2_t sum=vdupq_n_f64(0);
++    for(int x=0;x<N;++x){float64x2_t a=vdupq_n_f64(0),b=a;for(int y=0;y<N;y+=2){a=vfmaq_n_f64(a,vld1q_f64(&rowpair[2*idx[x*N+y]]),wy[y]);b=vfmaq_n_f64(b,vld1q_f64(&rowpair[2*idx[x*N+y+1]]),wy[y+1]);}sum=vfmaq_n_f64(sum,vaddq_f64(a,b),wx[x]);}
++    r=vgetq_lane_f64(sum,0);i=vgetq_lane_f64(sum,1);
++#else
++    r=0;i=0;for(int x=0;x<N;++x){double tr=0,ti=0;for(int y=0;y<N;++y){int k=idx[x*N+y];tr+=wy[y]*rowr[k];ti+=wy[y]*rowi[k];}r+=wx[x]*tr;i+=wx[x]*ti;}
++#endif
++  }
++  template<int N> void interpolate_fixed(size_t q,double &r,double &i) const {
++    if(compact_xy){if(!shortindices.empty())interpolate_compact<N>(q,&shortindices[q*N*N],r,i);else interpolate_compact<N>(q,&pointindices[q*N*N],r,i);return;}
++    const int *idx=&pointindices[q*N*N];
++    const double *wx=&pointweights[q*4*N],*wy=wx+2*N;
++#ifdef __aarch64__
++    float64x2_t sum=vdupq_n_f64(0);
++    for(int x=0;x<N;++x){
++      float64x2_t a=vdupq_n_f64(0),b=a;
++      for(int y=0;y<N;y+=2) {
++        a=vfmaq_f64(a,vld1q_f64(&rowpair[2*idx[x*N+y]]),vld1q_f64(wy+2*y));
++        b=vfmaq_f64(b,vld1q_f64(&rowpair[2*idx[x*N+y+1]]),vld1q_f64(wy+2*y+2));
++      }
++      sum=vfmaq_f64(sum,vaddq_f64(a,b),vld1q_f64(wx+2*x));
++    }
++    r=vgetq_lane_f64(sum,0);i=vgetq_lane_f64(sum,1);
++#else
++    r=0;i=0;
++    for(int x=0;x<N;++x){double tr=0,ti=0;for(int y=0;y<N;++y){int k=idx[x*N+y];tr+=wy[2*y]*rowr[k];ti+=wy[2*y+1]*rowi[k];}r+=wx[2*x]*tr;i+=wx[2*x+1]*ti;}
++#endif
++  }
++  void interpolate(size_t q,double &r,double &i) const {
++    if(order==6){interpolate_fixed<6>(q,r,i);return;}
++    if(order==4){interpolate_fixed<4>(q,r,i);return;}
++    const Point &p=points[q];r=0;i=0;
++    for(int x=0;x<order;++x) {
++      double tr=0,ti=0;
++      for(int y=0;y<order;++y){int k=p.ix[x*order+y];tr+=p.yr[y]*rowr[k];ti+=p.yi[y]*rowi[k];}
++      r+=p.xr[x]*tr;i+=p.xi[x]*ti;
++    }
++  }
++};
++typedef std::tuple<void*,Patch*,double,int,int,int,int> WaveKey;
++static std::map<WaveKey,WavePlan> wave_plans;
++#endif

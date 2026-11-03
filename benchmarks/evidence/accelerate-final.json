@@ -1,0 +1,13 @@
+{
+  "case": "public-large-b",
+  "samples_ms": [
+    1178.474888,
+    1055.040193,
+    1091.169983
+  ],
+  "runtime_ms": 1178.474888,
+  "timing_scope": "compute_field-call",
+  "correctness": true,
+  "score": 50.0,
+  "max_score": 50
+}

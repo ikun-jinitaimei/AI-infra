@@ -1,0 +1,9 @@
+case,stage,value,unit,evidence_type
+maimoe,handoff,3706.43,ms,historical_summary
+maimoe,parser,1343.395,ms,historical_summary
+maimoe,arm_sha,1125.801,ms,historical_summary
+maimoe,local_sort,880.307,ms,historical_summary
+maimoe,prefix_reuse,688.367,ms,historical_summary
+maimoe,vector_render,656.027,ms,historical_summary
+maimoe,specialized_render,621.028,ms,historical_summary
+maimoe,final,616.736593,ms,selected_result_json

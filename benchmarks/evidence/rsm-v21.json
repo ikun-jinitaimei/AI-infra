@@ -1,0 +1,22 @@
+{
+  "version": "v21",
+  "run_status": "completed",
+  "cases": [
+    {
+      "id": "performance",
+      "status": "success",
+      "message": "",
+      "score": 0.0,
+      "max-score": 100.0,
+      "metrics": {
+        "performance": {
+          "value": 5.256323224953311,
+          "unit": "ratio",
+          "objective": "maximize"
+        }
+      },
+      "checks": {}
+    }
+  ],
+  "note": "CLI score field is not the final leaderboard score; performance ratio is the relevant public metric."
+}
